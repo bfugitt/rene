@@ -474,15 +474,15 @@
                     </div>
 
                     {/* Game Area */}
-                    <div className="w-full max-w-2xl relative">
+                    <div className="w-full max-w-2xl flex flex-col gap-4">
                         
                         {/* Prompt / Feedback Banner */}
                         <div className={`
-                            absolute top-4 left-1/2 -translate-x-1/2 z-10 
-                            bg-white/95 backdrop-blur shadow-soft border border-gray-100
-                            px-8 py-4 rounded-2xl flex flex-col items-center justify-center
+                            w-full
+                            bg-white shadow-soft border border-gray-100
+                            px-6 py-4 rounded-2xl flex flex-col items-center justify-center
                             transition-all duration-300 transform
-                            ${feedback ? 'scale-105' : 'scale-100'}
+                            ${feedback ? 'scale-105 ring-2 ring-sage/20' : 'scale-100'}
                         `}>
                             <div className="text-pebble text-xs font-bold uppercase tracking-widest mb-1">
                                 {mode === 'point' ? 'Locate' : 'Connect'}
@@ -510,7 +510,7 @@
                         </div>
 
                         {/* Canvas */}
-                        <div className="relative w-full aspect-square bg-white rounded-3xl shadow-inner border border-black/5 overflow-hidden">
+                        <div className="w-full aspect-square bg-white rounded-3xl shadow-inner border border-black/5 overflow-hidden relative">
                             <canvas
                                 ref={canvasRef}
                                 width={800}
