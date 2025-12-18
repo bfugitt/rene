@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Coordinate Atelier</title>
     
     <!-- Tailwind CSS -->
@@ -39,7 +39,7 @@
             /* Reggio Dot Pattern Background */
             background-image: radial-gradient(var(--color-sage) 1px, transparent 1px);
             background-size: 40px 40px;
-            touch-action: pan-y;
+            touch-action: pan-y; /* Prevent scroll on touch interactions inside canvas */
         }
 
         h1, h2, h3 {
@@ -96,8 +96,8 @@
         }
     </script>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
-    <div id="root" class="w-full max-w-4xl"></div>
+<body class="min-h-screen flex items-center justify-center p-2 md:p-4">
+    <div id="root" class="w-full max-w-6xl"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useCallback } = React;
@@ -198,7 +198,6 @@
                 // Colors from theme
                 const COLOR_AXIS = '#4A4A4A'; // Stone
                 const COLOR_GRID = '#E8EDE9'; // Sage Light
-                const COLOR_TEXT = '#4A4A4A'; // Stone
                 const COLOR_SUCCESS = '#7C9082'; // Sage
                 const COLOR_ERROR = '#D4A373'; // Clay
                 
@@ -333,8 +332,6 @@
                 if (showConfetti) {
                     const confettiColors = [COLOR_SUCCESS, COLOR_ERROR, '#A8B5BA', '#4A4A4A'];
                     for(let k=0; k<50; k++) {
-                        // Deterministic randomish based on frame/index to avoid flicker if we were animating
-                        // Since this is static draw, simple random is fine per render cycle as long as showConfetti toggles
                         const cx = Math.random() * CANVAS_SIZE;
                         const cy = Math.random() * CANVAS_SIZE;
                         const r = Math.random() * 6 + 3;
@@ -405,17 +402,19 @@
             };
 
             // Button Base Class
-            const btnBase = "flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all border shadow-sm";
+            const btnBase = "flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full font-bold text-sm transition-all border shadow-sm w-full justify-center md:justify-start";
             const btnActive = "bg-sage text-white border-sage shadow-md";
             const btnInactive = "bg-white text-stone border-gray-200 hover:border-sage hover:text-sage";
 
             return (
-                <div className="bg-white/80 backdrop-blur-sm p-4 md:p-8 rounded-3xl shadow-soft border border-black/5 w-full flex flex-col items-center">
+                <div className="bg-white/80 backdrop-blur-sm p-4 md:p-6 lg:p-8 rounded-3xl shadow-soft border border-black/5 w-full flex flex-col md:flex-row gap-6 md:gap-8 items-stretch md:items-start min-h-[500px]">
                 
-                    {/* Header */}
-                    <header className="w-full flex flex-col md:flex-row justify-between items-center mb-6 gap-6">
+                    {/* Left Sidebar: Controls (Becomes Top on Mobile) */}
+                    <div className="flex-1 flex flex-col gap-4 md:gap-6 min-w-[240px]">
+                        
+                        {/* Header Section */}
                         <div>
-                            <h1 className="text-3xl font-serif font-bold text-stone flex items-center gap-2">
+                            <h1 className="text-2xl md:text-3xl font-serif font-bold text-stone flex items-center gap-2">
                                 <span className="p-2 bg-sage/10 rounded-xl text-sage">
                                     <Target className="w-6 h-6" />
                                 </span>
@@ -424,71 +423,104 @@
                             <p className="text-pebble text-sm mt-1 ml-1">An inquiry into points & lines</p>
                         </div>
 
+                        {/* Scoreboard */}
                         <div className="flex gap-4">
-                            <div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center min-w-[80px]">
+                            <div className="flex-1 bg-white px-4 py-3 rounded-2xl border border-gray-100 shadow-sm text-center">
                                 <div className="text-[10px] uppercase tracking-widest text-pebble font-bold">Streak</div>
                                 <div className="text-xl font-bold text-clay flex items-center justify-center gap-1">
                                     <Trophy className="w-4 h-4" /> {streak}
                                 </div>
                             </div>
-                            <div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center min-w-[80px]">
+                            <div className="flex-1 bg-white px-4 py-3 rounded-2xl border border-gray-100 shadow-sm text-center">
                                 <div className="text-[10px] uppercase tracking-widest text-pebble font-bold">Score</div>
                                 <div className="text-xl font-bold text-stone">{score}</div>
                             </div>
                         </div>
-                    </header>
 
-                    {/* Controls Row */}
-                    <div className="w-full flex flex-wrap gap-4 justify-center md:justify-between mb-6">
-                        {/* Mode */}
-                        <div className="flex bg-sage-light/50 p-1.5 rounded-full">
-                            <button 
-                                onClick={() => { setMode('point'); generateNewTarget(); }}
-                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${mode === 'point' ? 'bg-white text-sage shadow-sm' : 'text-pebble hover:text-stone'}`}
-                            >
-                                Points
-                            </button>
-                            <button 
-                                onClick={() => { setMode('line'); generateNewTarget(); }}
-                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${mode === 'line' ? 'bg-white text-sage shadow-sm' : 'text-pebble hover:text-stone'}`}
-                            >
-                                Lines
-                            </button>
+                        <div className="hidden md:block border-t border-gray-100 my-1"></div>
+
+                        {/* Mode Controls */}
+                        <div className="space-y-3">
+                            <div className="text-xs uppercase tracking-widest text-pebble font-bold ml-1">Challenge Type</div>
+                            <div className="flex bg-sage-light/50 p-1.5 rounded-2xl">
+                                <button 
+                                    onClick={() => { setMode('point'); generateNewTarget(); }}
+                                    className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-all ${mode === 'point' ? 'bg-white text-sage shadow-sm' : 'text-pebble hover:text-stone'}`}
+                                >
+                                    Points
+                                </button>
+                                <button 
+                                    onClick={() => { setMode('line'); generateNewTarget(); }}
+                                    className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-all ${mode === 'line' ? 'bg-white text-sage shadow-sm' : 'text-pebble hover:text-stone'}`}
+                                >
+                                    Lines
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Quadrants */}
-                        <div className="flex gap-2">
-                            <button 
-                                onClick={() => { setQuadrantMode('1'); generateNewTarget(); }}
-                                className={`${btnBase} ${quadrantMode === '1' ? btnActive : btnInactive}`}
-                            >
-                                <GridIcon className="w-4 h-4" /> Positive
-                            </button>
-                            <button 
-                                onClick={() => { setQuadrantMode('4'); generateNewTarget(); }}
-                                className={`${btnBase} ${quadrantMode === '4' ? btnActive : btnInactive}`}
-                            >
-                                <Maximize className="w-4 h-4" /> Full Grid
-                            </button>
+                        {/* Grid Controls */}
+                        <div className="space-y-3">
+                            <div className="text-xs uppercase tracking-widest text-pebble font-bold ml-1">Grid System</div>
+                            <div className="flex flex-col gap-2">
+                                <button 
+                                    onClick={() => { setQuadrantMode('1'); generateNewTarget(); }}
+                                    className={`${btnBase} ${quadrantMode === '1' ? btnActive : btnInactive}`}
+                                >
+                                    <GridIcon className="w-4 h-4" /> Positive Only (Q1)
+                                </button>
+                                <button 
+                                    onClick={() => { setQuadrantMode('4'); generateNewTarget(); }}
+                                    className={`${btnBase} ${quadrantMode === '4' ? btnActive : btnInactive}`}
+                                >
+                                    <Maximize className="w-4 h-4" /> Full Grid (4 Quadrants)
+                                </button>
+                            </div>
                         </div>
+
+                        {/* Size Controls */}
+                         <div className="space-y-3">
+                            <div className="text-xs uppercase tracking-widest text-pebble font-bold ml-1">Grid Scale</div>
+                             <div className="flex gap-2">
+                                {[5, 10, 20].map(size => (
+                                    <button 
+                                        key={size}
+                                        onClick={() => setGridSize(size)}
+                                        className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-colors
+                                            ${gridSize === size ? 'bg-stone text-white border-stone' : 'bg-white text-pebble border-gray-200 hover:border-stone'}
+                                        `}
+                                    >
+                                        {size}x{size}
+                                    </button>
+                                ))}
+                             </div>
+                        </div>
+
+                         <div className="flex-1 hidden md:block"></div> {/* Spacer for desktop */}
+                         
+                         <button 
+                            onClick={generateNewTarget}
+                            className="w-full text-stone hover:text-sage font-bold text-sm flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-gray-50 hover:bg-sage-light/50 transition-colors border border-transparent hover:border-sage-light"
+                         >
+                            <RefreshCw className="w-4 h-4" /> Skip Challenge
+                         </button>
                     </div>
 
-                    {/* Game Area */}
-                    <div className="w-full max-w-2xl flex flex-col gap-4">
+                    {/* Right Area: Workspace (Canvas) */}
+                    <div className="flex-[2] flex flex-col items-center justify-start relative w-full">
                         
                         {/* Prompt / Feedback Banner */}
                         <div className={`
-                            w-full
+                            w-full mb-4
                             bg-white shadow-soft border border-gray-100
                             px-6 py-4 rounded-2xl flex flex-col items-center justify-center
                             transition-all duration-300 transform
-                            ${feedback ? 'scale-105 ring-2 ring-sage/20' : 'scale-100'}
+                            ${feedback ? 'ring-2 ring-sage/20' : ''}
                         `}>
                             <div className="text-pebble text-xs font-bold uppercase tracking-widest mb-1">
                                 {mode === 'point' ? 'Locate' : 'Connect'}
                             </div>
                             
-                            <div className="text-3xl font-serif font-bold text-stone flex gap-3 items-center">
+                            <div className="text-3xl font-serif font-bold text-stone flex gap-3 items-center flex-wrap justify-center">
                                 {targets.map((t, i) => {
                                     const isFound = foundPoints.some(p => p.x === t.x && p.y === t.y);
                                     return (
@@ -509,41 +541,22 @@
                             </div>
                         </div>
 
-                        {/* Canvas */}
-                        <div className="w-full aspect-square bg-white rounded-3xl shadow-inner border border-black/5 overflow-hidden relative">
+                        {/* Canvas Container with Max Height Logic */}
+                        <div className="w-full max-h-[60vh] md:max-h-[75vh] aspect-square bg-white rounded-3xl shadow-inner border border-black/5 overflow-hidden relative">
                             <canvas
                                 ref={canvasRef}
                                 width={800}
                                 height={800}
                                 onClick={handleCanvasClick}
-                                className="w-full h-full touch-none cursor-crosshair"
+                                className="w-full h-full touch-none cursor-crosshair object-contain"
                                 style={{ touchAction: 'none' }}
                             />
                         </div>
-
-                        {/* Footer Controls */}
-                        <div className="mt-4 flex justify-between items-center px-2">
-                             <div className="flex gap-2">
-                                {[5, 10, 20].map(size => (
-                                    <button 
-                                        key={size}
-                                        onClick={() => setGridSize(size)}
-                                        className={`w-8 h-8 rounded-full text-xs font-bold border transition-colors
-                                            ${gridSize === size ? 'bg-stone text-white border-stone' : 'bg-white text-pebble border-gray-200 hover:border-stone'}
-                                        `}
-                                    >
-                                        {size}
-                                    </button>
-                                ))}
-                             </div>
-
-                             <button 
-                                onClick={generateNewTarget}
-                                className="text-stone hover:text-sage font-bold text-sm flex items-center gap-2 px-4 py-2 rounded-full hover:bg-sage-light/50 transition-colors"
-                             >
-                                <RefreshCw className="w-4 h-4" /> Skip Challenge
-                             </button>
+                        
+                        <div className="mt-2 text-xs text-pebble text-center hidden md:block">
+                            Horizontal axis: <span className="font-bold">x</span> &bull; Vertical axis: <span className="font-bold">y</span>
                         </div>
+
                     </div>
                 </div>
             );
