@@ -147,7 +147,7 @@
 
             // Layout constants
             const PADDING = 40;
-            const CANVAS_SIZE = 800; // Increased internal res for crispness
+            const CANVAS_SIZE = 800; // Internal resolution
 
             // Calculate range based on settings
             const getRange = useCallback(() => {
@@ -231,7 +231,6 @@
                     ctx.stroke();
 
                     // X Labels
-                    // Logic: Always show 0, 5, 10 etc. or all if small grid
                     const shouldShowLabel = Math.abs(i) % (gridSize >= 20 && quadrantMode === '4' ? 5 : 1) === 0;
                     
                     if (shouldShowLabel) {
@@ -349,11 +348,16 @@
             // Handle Click
             const handleCanvasClick = (e) => {
                 if (feedback === 'correct') return;
+                e.preventDefault();
 
                 const canvas = canvasRef.current;
                 const rect = canvas.getBoundingClientRect();
+                
+                // Calculate scale factors
                 const scaleX = CANVAS_SIZE / rect.width;
                 const scaleY = CANVAS_SIZE / rect.height;
+                
+                // Get click position relative to the canvas element
                 const clickX = (e.clientX - rect.left) * scaleX;
                 const clickY = (e.clientY - rect.top) * scaleY;
 
@@ -362,6 +366,7 @@
                 const graphWidth = CANVAS_SIZE - (PADDING * 2);
                 const spacing = graphWidth / totalUnits;
 
+                // Convert pixels to grid units
                 let gridX = Math.round(((clickX - PADDING) / spacing) + min);
                 let gridY = Math.round((((CANVAS_SIZE - PADDING) - clickY) / spacing) + min);
 
@@ -495,7 +500,7 @@
                              </div>
                         </div>
 
-                         <div className="flex-1 hidden md:block"></div> {/* Spacer for desktop */}
+                         <div className="flex-1 hidden md:block"></div>
                          
                          <button 
                             onClick={generateNewTarget}
@@ -506,7 +511,7 @@
                     </div>
 
                     {/* Right Area: Workspace (Canvas) */}
-                    <div className="flex-[2] flex flex-col items-center justify-start relative w-full">
+                    <div className="flex-[2] flex flex-col items-center justify-start relative w-full min-h-[300px]">
                         
                         {/* Prompt / Feedback Banner */}
                         <div className={`
@@ -541,14 +546,23 @@
                             </div>
                         </div>
 
-                        {/* Canvas Container with Max Height Logic */}
-                        <div className="w-full max-h-[60vh] md:max-h-[75vh] aspect-square bg-white rounded-3xl shadow-inner border border-black/5 overflow-hidden relative">
+                        {/* Canvas Container Update:
+                            - Removed 'aspect-square' from container to allow flexibility in layout
+                            - Added centering flex properties
+                            - Canvas itself now handles aspect ratio
+                        */}
+                        <div className="w-full h-full flex items-center justify-center min-h-[300px] flex-1">
+                             {/* Canvas Element Update:
+                                - Removed 'w-full h-full object-contain'
+                                - Added 'max-w-full max-h-full aspect-square'
+                                - This ensures the canvas ELEMENT is square, removing letterboxing issues
+                             */}
                             <canvas
                                 ref={canvasRef}
                                 width={800}
                                 height={800}
                                 onClick={handleCanvasClick}
-                                className="w-full h-full touch-none cursor-crosshair object-contain"
+                                className="max-w-full max-h-[60vh] md:max-h-[75vh] aspect-square bg-white rounded-3xl shadow-inner border border-black/5 touch-none cursor-crosshair"
                                 style={{ touchAction: 'none' }}
                             />
                         </div>
