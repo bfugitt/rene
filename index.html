@@ -1,0 +1,387 @@
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Trophy, RefreshCw, Check, X, Target, Info, Slash } from 'lucide-react';
+
+const CoordinateGame = () => {
+  const [mode, setMode] = useState('point'); // 'point' or 'line'
+  const [targets, setTargets] = useState([{ x: 0, y: 0 }]); // Array of points to find
+  const [foundPoints, setFoundPoints] = useState([]); // Points correctly found this round
+  
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [feedback, setFeedback] = useState(null); // 'correct', 'incorrect', 'partial', or null
+  const [clickedPoint, setClickedPoint] = useState(null); // Last clicked point (for error display)
+  const [gridSize, setGridSize] = useState(10); 
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  const canvasRef = useRef(null);
+
+  // Layout constants
+  const PADDING = 40;
+  const CANVAS_SIZE = 600;
+
+  // Generate new challenge based on mode
+  const generateNewTarget = useCallback(() => {
+    setFeedback(null);
+    setClickedPoint(null);
+    setShowConfetti(false);
+    setFoundPoints([]);
+
+    const getRandomPoint = () => ({
+      x: Math.floor(Math.random() * (gridSize + 1)),
+      y: Math.floor(Math.random() * (gridSize + 1))
+    });
+
+    if (mode === 'point') {
+      setTargets([getRandomPoint()]);
+    } else {
+      // Line mode: generate 2 distinct points
+      const p1 = getRandomPoint();
+      let p2 = getRandomPoint();
+      // Ensure they aren't the same point
+      while (p1.x === p2.x && p1.y === p2.y) {
+        p2 = getRandomPoint();
+      }
+      setTargets([p1, p2]);
+    }
+  }, [gridSize, mode]);
+
+  // Initial load & Mode change
+  useEffect(() => {
+    generateNewTarget();
+  }, [generateNewTarget]);
+
+  // Handle Canvas Drawing
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    
+    const graphWidth = CANVAS_SIZE - (PADDING * 2);
+    const spacing = graphWidth / gridSize;
+
+    const toPixelX = (x) => PADDING + (x * spacing);
+    const toPixelY = (y) => (CANVAS_SIZE - PADDING) - (y * spacing);
+
+    // --- Draw Grid ---
+    ctx.lineWidth = 1;
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    for (let i = 0; i <= gridSize; i++) {
+      const pos = i * spacing;
+      
+      // Vertical lines
+      const xPixel = PADDING + pos;
+      ctx.beginPath();
+      ctx.strokeStyle = i === 0 ? '#000' : '#e5e7eb';
+      ctx.lineWidth = i === 0 ? 3 : 1;
+      ctx.moveTo(xPixel, PADDING);
+      ctx.lineTo(xPixel, CANVAS_SIZE - PADDING);
+      ctx.stroke();
+
+      // X Axis Labels
+      ctx.fillStyle = '#4b5563';
+      ctx.fillText(i.toString(), xPixel, CANVAS_SIZE - PADDING + 20);
+
+      // Horizontal lines
+      const yPixel = (CANVAS_SIZE - PADDING) - pos;
+      ctx.beginPath();
+      ctx.strokeStyle = i === 0 ? '#000' : '#e5e7eb';
+      ctx.lineWidth = i === 0 ? 3 : 1;
+      ctx.moveTo(PADDING, yPixel);
+      ctx.lineTo(CANVAS_SIZE - PADDING, yPixel);
+      ctx.stroke();
+
+      // Y Axis Labels
+      ctx.fillStyle = '#4b5563';
+      ctx.fillText(i.toString(), PADDING - 20, yPixel);
+    }
+
+    // Axis Titles
+    ctx.save();
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillStyle = '#000';
+    ctx.fillText('X', CANVAS_SIZE / 2, CANVAS_SIZE - 5);
+    ctx.translate(15, CANVAS_SIZE / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('Y', 0, 0);
+    ctx.restore();
+
+    // --- Draw Game Elements ---
+
+    // 1. Draw Correctly Found Points
+    foundPoints.forEach(p => {
+      const px = toPixelX(p.x);
+      const py = toPixelY(p.y);
+      ctx.beginPath();
+      ctx.arc(px, py, 8, 0, 2 * Math.PI);
+      ctx.fillStyle = '#22c55e'; // Green
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      // Label
+      ctx.fillStyle = '#166534';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText(`(${p.x}, ${p.y})`, px, py - 15);
+    });
+
+    // 2. Draw Line if Mode is 'line' and complete
+    if (mode === 'line' && foundPoints.length === 2) {
+      const p1 = foundPoints[0];
+      const p2 = foundPoints[1];
+      ctx.beginPath();
+      ctx.moveTo(toPixelX(p1.x), toPixelY(p1.y));
+      ctx.lineTo(toPixelX(p2.x), toPixelY(p2.y));
+      ctx.strokeStyle = '#22c55e';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+    }
+
+    // 3. Draw Wrong Click (if any)
+    if (clickedPoint && feedback === 'incorrect') {
+      const px = toPixelX(clickedPoint.x);
+      const py = toPixelY(clickedPoint.y);
+      ctx.beginPath();
+      ctx.arc(px, py, 8, 0, 2 * Math.PI);
+      ctx.fillStyle = '#ef4444'; // Red
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      
+      ctx.fillStyle = '#991b1b';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText(`(${clickedPoint.x}, ${clickedPoint.y})`, px, py - 15);
+    }
+    
+    // 4. Confetti
+    if (showConfetti) {
+      for(let k=0; k<50; k++) {
+        const cx = Math.random() * CANVAS_SIZE;
+        const cy = Math.random() * CANVAS_SIZE;
+        const r = Math.random() * 5 + 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = `hsl(${Math.random() * 360}, 100%, 50%)`;
+        ctx.fill();
+      }
+    }
+
+  }, [targets, foundPoints, clickedPoint, feedback, gridSize, showConfetti, mode]);
+
+  // Handle Click
+  const handleCanvasClick = (e) => {
+    // Prevent clicking if already won
+    if (feedback === 'correct') return;
+
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = CANVAS_SIZE / rect.width;
+    const scaleY = CANVAS_SIZE / rect.height;
+    const clickX = (e.clientX - rect.left) * scaleX;
+    const clickY = (e.clientY - rect.top) * scaleY;
+    const graphWidth = CANVAS_SIZE - (PADDING * 2);
+    const spacing = graphWidth / gridSize;
+
+    // Convert pixels to grid units
+    let gridX = Math.round((clickX - PADDING) / spacing);
+    let gridY = Math.round(((CANVAS_SIZE - PADDING) - clickY) / spacing);
+    gridX = Math.max(0, Math.min(gridSize, gridX));
+    gridY = Math.max(0, Math.min(gridSize, gridY));
+
+    // Check if this point was already found
+    if (foundPoints.some(p => p.x === gridX && p.y === gridY)) {
+      return; // Ignore clicks on already found points
+    }
+
+    setClickedPoint({ x: gridX, y: gridY });
+
+    // Check against all remaining targets
+    const isTarget = targets.some(t => t.x === gridX && t.y === gridY);
+
+    if (isTarget) {
+      handleHit(gridX, gridY);
+    } else {
+      handleMiss();
+    }
+  };
+
+  const handleHit = (x, y) => {
+    const newFound = [...foundPoints, {x, y}];
+    setFoundPoints(newFound);
+
+    // Check completion
+    if (newFound.length === targets.length) {
+      setFeedback('correct');
+      setScore(s => s + (mode === 'line' ? 20 : 10)); // More points for lines
+      setStreak(s => s + 1);
+      setShowConfetti(true);
+      setTimeout(() => generateNewTarget(), 2000); // Slightly longer delay to see the line
+    } else {
+      // Found one, but need more
+      setFeedback('partial');
+    }
+  };
+
+  const handleMiss = () => {
+    setFeedback('incorrect');
+    setStreak(0);
+  };
+
+  return (
+    <div className="min-h-screen bg-blue-50 p-4 font-sans text-slate-800 flex flex-col items-center">
+      
+      {/* Header */}
+      <header className="w-full max-w-2xl flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm mb-4 gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-blue-600 flex items-center gap-2">
+            <Target className="w-6 h-6" />
+            Grid Master
+          </h1>
+          <p className="text-slate-500 text-sm">4th Grade Coordinate Practice</p>
+        </div>
+
+        {/* Level Selector */}
+        <div className="bg-slate-100 p-1 rounded-lg flex">
+            <button 
+                onClick={() => { setMode('point'); generateNewTarget(); }}
+                className={`px-4 py-2 rounded-md text-sm font-semibold transition-all ${mode === 'point' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                Level 1: Points
+            </button>
+            <button 
+                onClick={() => { setMode('line'); generateNewTarget(); }}
+                className={`px-4 py-2 rounded-md text-sm font-semibold transition-all flex items-center gap-1 ${mode === 'line' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+                Level 2: Lines
+            </button>
+        </div>
+
+        <div className="flex gap-4">
+           <div className="text-center">
+            <div className="text-xs uppercase tracking-wider text-slate-400 font-bold">Streak</div>
+            <div className="text-xl font-bold text-orange-500 flex items-center justify-center gap-1">
+              <Trophy className="w-4 h-4" /> {streak}
+            </div>
+           </div>
+           <div className="text-center">
+            <div className="text-xs uppercase tracking-wider text-slate-400 font-bold">Score</div>
+            <div className="text-xl font-bold text-slate-700">{score}</div>
+           </div>
+        </div>
+      </header>
+
+      {/* Main Game Card */}
+      <div className="bg-white p-2 rounded-2xl shadow-lg w-full max-w-2xl flex flex-col items-center relative overflow-hidden">
+        
+        {/* Instruction Banner */}
+        <div className={`w-full p-4 mb-2 rounded-xl flex flex-col items-center justify-center transition-colors duration-300
+          ${feedback === 'correct' ? 'bg-green-100' : feedback === 'incorrect' ? 'bg-red-100' : 'bg-blue-100'}`}>
+          
+          <div className="text-slate-600 text-sm font-semibold uppercase tracking-wide mb-1">
+            {mode === 'point' ? 'Find this location' : 'Plot these endpoints'}
+          </div>
+          
+          <div className="text-3xl md:text-4xl font-black text-slate-800 tracking-tight flex flex-wrap justify-center items-center gap-2 md:gap-4">
+            {targets.map((t, i) => {
+               // Check if this specific target has been found
+               const isFound = foundPoints.some(p => p.x === t.x && p.y === t.y);
+               return (
+                   <div key={i} className={`flex items-center transition-opacity ${isFound ? 'opacity-40' : 'opacity-100'}`}>
+                        <span className="text-blue-600">({t.x}, {t.y})</span>
+                        {/* Show "and" if it's not the last item */}
+                        {i < targets.length - 1 && <span className="text-slate-400 text-xl font-normal ml-2 md:ml-4">and</span>}
+                   </div>
+               )
+            })}
+          </div>
+
+          {/* Feedback Message */}
+          <div className="h-6 mt-2 text-center">
+            {feedback === 'correct' && (
+              <span className="text-green-600 font-bold flex items-center justify-center gap-1 animate-bounce">
+                <Check className="w-5 h-5" /> Excellent!
+              </span>
+            )}
+            {feedback === 'incorrect' && (
+              <span className="text-red-500 font-bold flex items-center justify-center gap-1">
+                <X className="w-5 h-5" /> Incorrect. You clicked ({clickedPoint?.x}, {clickedPoint?.y})
+              </span>
+            )}
+            {feedback === 'partial' && (
+               <span className="text-blue-600 font-bold flex items-center justify-center gap-1">
+                 <Check className="w-4 h-4" /> Good! Now find the other point.
+               </span>
+            )}
+            {!feedback && (
+               <span className="text-blue-400 text-sm flex items-center justify-center gap-1">
+                 <Info className="w-4 h-4" /> Tap the intersection on the grid
+               </span>
+            )}
+          </div>
+        </div>
+
+        {/* Canvas Container */}
+        <div className="relative w-full aspect-square max-w-[500px] cursor-crosshair">
+          <canvas
+            ref={canvasRef}
+            width={600}
+            height={600}
+            onClick={handleCanvasClick}
+            className="w-full h-full touch-none select-none"
+            style={{ touchAction: 'none' }}
+          />
+        </div>
+
+        {/* Controls */}
+        <div className="w-full border-t p-4 mt-2 flex justify-between items-center">
+            <div className="text-xs text-slate-400 hidden md:block">
+               Remember: <b>X</b> is across (walk), <b>Y</b> is up (fly).
+            </div>
+            <button 
+              onClick={generateNewTarget}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors ml-auto md:ml-0"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Skip
+            </button>
+        </div>
+
+      </div>
+
+      {/* Grid Settings */}
+      <div className="mt-8 text-center">
+         <p className="text-slate-400 text-xs mb-2">Teacher Controls</p>
+         <div className="flex gap-2 justify-center">
+            <button 
+              onClick={() => setGridSize(5)}
+              className={`px-3 py-1 text-xs rounded-full border ${gridSize === 5 ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-300'}`}
+            >
+              5x5
+            </button>
+            <button 
+              onClick={() => setGridSize(10)}
+              className={`px-3 py-1 text-xs rounded-full border ${gridSize === 10 ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-300'}`}
+            >
+              10x10
+            </button>
+            <button 
+              onClick={() => setGridSize(20)}
+              className={`px-3 py-1 text-xs rounded-full border ${gridSize === 20 ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-300'}`}
+            >
+              20x20
+            </button>
+         </div>
+      </div>
+
+    </div>
+  );
+};
+
+export default CoordinateGame;
