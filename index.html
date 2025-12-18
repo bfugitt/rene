@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grid Master - Coordinate Practice</title>
+    <title>Coordinate Atelier</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -15,19 +15,94 @@
     <!-- Babel for JSX -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- Reggio Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+
     <style>
+        /* --- Reggio "Lumi" Theme Variables & Base Styles --- */
+        :root {
+            --bg-paper: #FDFBF7;
+            --color-sage: #7C9082;
+            --color-sage-light: #E8EDE9;
+            --color-clay: #D4A373;
+            --color-stone: #4A4A4A;
+            --color-pebble: #A8B5BA;
+            --shadow-soft: 0 8px 24px rgba(124, 144, 130, 0.12);
+        }
+
         body {
+            font-family: 'Lato', sans-serif;
+            background-color: var(--bg-paper);
+            color: var(--color-stone);
+            /* Reggio Dot Pattern Background */
+            background-image: radial-gradient(var(--color-sage) 1px, transparent 1px);
+            background-size: 40px 40px;
             touch-action: pan-y;
         }
+
+        h1, h2, h3 {
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* Custom Scrollbar for nicer feel */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-pebble);
+            border-radius: 4px;
+        }
+
+        /* Utility classes for dynamic usage in React if needed */
+        .text-sage { color: var(--color-sage); }
+        .text-clay { color: var(--color-clay); }
+        .bg-sage { background-color: var(--color-sage); }
+        .bg-paper { background-color: var(--bg-paper); }
     </style>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sage: {
+                            DEFAULT: '#7C9082',
+                            light: '#E8EDE9',
+                            dark: '#6A7F70'
+                        },
+                        clay: {
+                            DEFAULT: '#D4A373',
+                            light: '#F5E6D8'
+                        },
+                        stone: '#4A4A4A',
+                        pebble: '#A8B5BA',
+                        paper: '#FDFBF7'
+                    },
+                    fontFamily: {
+                        serif: ['"Playfair Display"', 'serif'],
+                        sans: ['Lato', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'soft': '0 8px 24px rgba(124, 144, 130, 0.12)',
+                        'card': '0 20px 60px rgba(0,0,0,0.05)',
+                    }
+                }
+            }
+        }
+    </script>
 </head>
-<body class="bg-blue-50">
-    <div id="root"></div>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div id="root" class="w-full max-w-4xl"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef, useCallback } = React;
 
-        // --- Icons (Inline SVGs to avoid dependencies) ---
+        // --- Icons (Inline SVGs) ---
         const Trophy = ({ className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
         );
@@ -46,7 +121,7 @@
         const Info = ({ className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
         );
-        const Grid = ({ className }) => (
+        const GridIcon = ({ className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
         );
         const Maximize = ({ className }) => (
@@ -72,7 +147,7 @@
 
             // Layout constants
             const PADDING = 40;
-            const CANVAS_SIZE = 600;
+            const CANVAS_SIZE = 800; // Increased internal res for crispness
 
             // Calculate range based on settings
             const getRange = useCallback(() => {
@@ -95,20 +170,17 @@
 
                 const getRandomCoord = () => Math.floor(Math.random() * (range + 1)) + min;
 
-                // Helper to avoid generating (0,0) too often or same points
                 const generatePoint = () => ({ x: getRandomCoord(), y: getRandomCoord() });
 
                 if (mode === 'point') {
-                setTargets([generatePoint()]);
+                    setTargets([generatePoint()]);
                 } else {
-                // Line mode: generate 2 distinct points
-                const p1 = generatePoint();
-                let p2 = generatePoint();
-                // Ensure they aren't the same point
-                while (p1.x === p2.x && p1.y === p2.y) {
-                    p2 = generatePoint();
-                }
-                setTargets([p1, p2]);
+                    const p1 = generatePoint();
+                    let p2 = generatePoint();
+                    while (p1.x === p2.x && p1.y === p2.y) {
+                        p2 = generatePoint();
+                    }
+                    setTargets([p1, p2]);
                 }
             }, [getRange, mode]);
 
@@ -123,6 +195,13 @@
                 if (!canvas) return;
                 const ctx = canvas.getContext('2d');
                 
+                // Colors from theme
+                const COLOR_AXIS = '#4A4A4A'; // Stone
+                const COLOR_GRID = '#E8EDE9'; // Sage Light
+                const COLOR_TEXT = '#4A4A4A'; // Stone
+                const COLOR_SUCCESS = '#7C9082'; // Sage
+                const COLOR_ERROR = '#D4A373'; // Clay
+                
                 // Clear canvas
                 ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
                 
@@ -132,138 +211,140 @@
                 const graphWidth = CANVAS_SIZE - (PADDING * 2);
                 const spacing = graphWidth / totalUnits;
 
-                // Helper: Coordinate Value -> Pixel Location
                 const toPixelX = (x) => PADDING + ((x - min) * spacing);
                 const toPixelY = (y) => (CANVAS_SIZE - PADDING) - ((y - min) * spacing);
 
                 // --- Draw Grid ---
-                ctx.font = '12px sans-serif';
+                ctx.font = '14px Lato';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
 
                 for (let i = min; i <= max; i++) {
-                
-                const isAxis = i === 0;
-                
-                // Vertical lines (X varies, draws at X=i)
-                const xPixel = toPixelX(i);
-                ctx.beginPath();
-                ctx.strokeStyle = isAxis ? '#000' : '#e5e7eb';
-                ctx.lineWidth = isAxis ? 3 : 1;
-                ctx.moveTo(xPixel, PADDING);
-                ctx.lineTo(xPixel, CANVAS_SIZE - PADDING);
-                ctx.stroke();
+                    const isAxis = i === 0;
+                    
+                    // Vertical lines
+                    const xPixel = toPixelX(i);
+                    ctx.beginPath();
+                    ctx.strokeStyle = isAxis ? COLOR_AXIS : COLOR_GRID;
+                    ctx.lineWidth = isAxis ? 3 : 1;
+                    ctx.moveTo(xPixel, PADDING);
+                    ctx.lineTo(xPixel, CANVAS_SIZE - PADDING);
+                    ctx.stroke();
 
-                // X Axis Labels
-                // Only draw labels for even numbers if it gets too crowded, or all for standard
-                if (Math.abs(i) % (gridSize >= 20 && quadrantMode === '4' ? 5 : 1) === 0) {
-                    ctx.fillStyle = isAxis ? '#000' : '#6b7280';
-                    ctx.font = isAxis ? 'bold 12px sans-serif' : '12px sans-serif';
-                    // Adjust label position if it's the axis origin to avoid overlap
-                    if (!(i === 0 && quadrantMode === '4')) {
-                    ctx.fillText(i.toString(), xPixel, CANVAS_SIZE - PADDING + 20);
+                    // X Labels
+                    // Logic: Always show 0, 5, 10 etc. or all if small grid
+                    const shouldShowLabel = Math.abs(i) % (gridSize >= 20 && quadrantMode === '4' ? 5 : 1) === 0;
+                    
+                    if (shouldShowLabel) {
+                        ctx.fillStyle = isAxis ? COLOR_AXIS : '#A8B5BA'; // Pebble for non-axis labels
+                        ctx.font = isAxis ? 'bold 14px Lato' : '14px Lato';
+                        if (!(i === 0 && quadrantMode === '4')) {
+                            ctx.fillText(i.toString(), xPixel, CANVAS_SIZE - PADDING + 25);
+                        }
                     }
-                }
 
-                // Horizontal lines (Y varies, draws at Y=i)
-                const yPixel = toPixelY(i);
-                ctx.beginPath();
-                ctx.strokeStyle = isAxis ? '#000' : '#e5e7eb';
-                ctx.lineWidth = isAxis ? 3 : 1;
-                ctx.moveTo(PADDING, yPixel);
-                ctx.lineTo(CANVAS_SIZE - PADDING, yPixel);
-                ctx.stroke();
+                    // Horizontal lines
+                    const yPixel = toPixelY(i);
+                    ctx.beginPath();
+                    ctx.strokeStyle = isAxis ? COLOR_AXIS : COLOR_GRID;
+                    ctx.lineWidth = isAxis ? 3 : 1;
+                    ctx.moveTo(PADDING, yPixel);
+                    ctx.lineTo(CANVAS_SIZE - PADDING, yPixel);
+                    ctx.stroke();
 
-                // Y Axis Labels
-                if (Math.abs(i) % (gridSize >= 20 && quadrantMode === '4' ? 5 : 1) === 0) {
-                    ctx.fillStyle = isAxis ? '#000' : '#6b7280';
-                    ctx.font = isAxis ? 'bold 12px sans-serif' : '12px sans-serif';
-                    if (!(i === 0 && quadrantMode === '4')) {
-                        ctx.fillText(i.toString(), PADDING - 20, yPixel);
+                    // Y Labels
+                    if (shouldShowLabel) {
+                        ctx.fillStyle = isAxis ? COLOR_AXIS : '#A8B5BA';
+                        ctx.font = isAxis ? 'bold 14px Lato' : '14px Lato';
+                        if (!(i === 0 && quadrantMode === '4')) {
+                            ctx.fillText(i.toString(), PADDING - 25, yPixel);
+                        }
                     }
-                }
                 }
                 
                 // Draw "0" explicitly for origin in 4-quadrant mode
                 if (quadrantMode === '4') {
                     const originX = toPixelX(0);
                     const originY = toPixelY(0);
-                    ctx.fillStyle = '#000';
-                    ctx.font = 'bold 12px sans-serif';
-                    ctx.fillText("0", originX - 12, originY + 12);
+                    ctx.fillStyle = COLOR_AXIS;
+                    ctx.font = 'bold 14px Lato';
+                    ctx.fillText("0", originX - 15, originY + 15);
                 }
 
-                // Axis Titles (X and Y arrows)
+                // Axis Arrows/Titles
                 ctx.save();
-                ctx.font = 'bold 16px sans-serif';
-                ctx.fillStyle = '#000';
-                // X Label
-                ctx.fillText('X', CANVAS_SIZE - 15, toPixelY(0) - 15);
-                // Y Label
-                ctx.fillText('Y', toPixelX(0) + 15, PADDING - 10);
+                ctx.font = 'bold 18px Playfair Display';
+                ctx.fillStyle = COLOR_AXIS;
+                ctx.fillText('x', CANVAS_SIZE - 15, toPixelY(0) - 15);
+                ctx.fillText('y', toPixelX(0) + 20, PADDING - 10);
                 ctx.restore();
 
                 // --- Draw Game Elements ---
 
-                // 1. Draw Correctly Found Points
+                // 1. Found Points
                 foundPoints.forEach(p => {
-                const px = toPixelX(p.x);
-                const py = toPixelY(p.y);
-                ctx.beginPath();
-                ctx.arc(px, py, 8, 0, 2 * Math.PI);
-                ctx.fillStyle = '#22c55e'; // Green
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                // Label
-                ctx.fillStyle = '#166534';
-                ctx.font = 'bold 14px sans-serif';
-                // Adjust label position to not cover the point or line
-                ctx.fillText(`(${p.x}, ${p.y})`, px, py - 20);
+                    const px = toPixelX(p.x);
+                    const py = toPixelY(p.y);
+                    ctx.beginPath();
+                    ctx.arc(px, py, 10, 0, 2 * Math.PI);
+                    ctx.fillStyle = COLOR_SUCCESS;
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    
+                    // Label
+                    ctx.fillStyle = COLOR_SUCCESS;
+                    ctx.font = 'bold 16px Lato';
+                    ctx.fillText(`(${p.x}, ${p.y})`, px, py - 25);
                 });
 
-                // 2. Draw Line if Mode is 'line' and complete
+                // 2. Line
                 if (mode === 'line' && foundPoints.length === 2) {
-                const p1 = foundPoints[0];
-                const p2 = foundPoints[1];
-                ctx.beginPath();
-                ctx.moveTo(toPixelX(p1.x), toPixelY(p1.y));
-                ctx.lineTo(toPixelX(p2.x), toPixelY(p2.y));
-                ctx.strokeStyle = '#22c55e';
-                ctx.lineWidth = 4;
-                ctx.stroke();
+                    const p1 = foundPoints[0];
+                    const p2 = foundPoints[1];
+                    ctx.beginPath();
+                    ctx.moveTo(toPixelX(p1.x), toPixelY(p1.y));
+                    ctx.lineTo(toPixelX(p2.x), toPixelY(p2.y));
+                    ctx.strokeStyle = COLOR_SUCCESS;
+                    ctx.lineWidth = 5;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
                 }
 
-                // 3. Draw Wrong Click (if any)
+                // 3. Wrong Click
                 if (clickedPoint && feedback === 'incorrect') {
-                const px = toPixelX(clickedPoint.x);
-                const py = toPixelY(clickedPoint.y);
-                ctx.beginPath();
-                ctx.arc(px, py, 8, 0, 2 * Math.PI);
-                ctx.fillStyle = '#ef4444'; // Red
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-                
-                ctx.fillStyle = '#991b1b';
-                ctx.font = 'bold 14px sans-serif';
-                ctx.fillText(`(${clickedPoint.x}, ${clickedPoint.y})`, px, py - 20);
-                }
-                
-                // 4. Confetti
-                if (showConfetti) {
-                for(let k=0; k<50; k++) {
-                    const cx = Math.random() * CANVAS_SIZE;
-                    const cy = Math.random() * CANVAS_SIZE;
-                    const r = Math.random() * 5 + 2;
+                    const px = toPixelX(clickedPoint.x);
+                    const py = toPixelY(clickedPoint.y);
                     ctx.beginPath();
-                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-                    ctx.fillStyle = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                    ctx.arc(px, py, 10, 0, 2 * Math.PI);
+                    ctx.fillStyle = COLOR_ERROR;
                     ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                    
+                    ctx.fillStyle = COLOR_ERROR;
+                    ctx.font = 'bold 16px Lato';
+                    ctx.fillText(`(${clickedPoint.x}, ${clickedPoint.y})`, px, py - 25);
                 }
+                
+                // 4. Confetti (Reggio Style Colors)
+                if (showConfetti) {
+                    const confettiColors = [COLOR_SUCCESS, COLOR_ERROR, '#A8B5BA', '#4A4A4A'];
+                    for(let k=0; k<50; k++) {
+                        // Deterministic randomish based on frame/index to avoid flicker if we were animating
+                        // Since this is static draw, simple random is fine per render cycle as long as showConfetti toggles
+                        const cx = Math.random() * CANVAS_SIZE;
+                        const cy = Math.random() * CANVAS_SIZE;
+                        const r = Math.random() * 6 + 3;
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                        ctx.fillStyle = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+                        ctx.globalAlpha = 0.6;
+                        ctx.fill();
+                        ctx.globalAlpha = 1.0;
+                    }
                 }
 
             }, [targets, foundPoints, clickedPoint, feedback, gridSize, showConfetti, mode, quadrantMode, getRange]);
@@ -284,28 +365,22 @@
                 const graphWidth = CANVAS_SIZE - (PADDING * 2);
                 const spacing = graphWidth / totalUnits;
 
-                // Convert pixels to grid units
-                // Formula inverse of toPixelX/Y
                 let gridX = Math.round(((clickX - PADDING) / spacing) + min);
                 let gridY = Math.round((((CANVAS_SIZE - PADDING) - clickY) / spacing) + min);
 
-                // Clamp values
                 gridX = Math.max(min, Math.min(max, gridX));
                 gridY = Math.max(min, Math.min(max, gridY));
 
-                // Check if this point was already found
-                if (foundPoints.some(p => p.x === gridX && p.y === gridY)) {
-                return; 
-                }
+                if (foundPoints.some(p => p.x === gridX && p.y === gridY)) return; 
 
                 setClickedPoint({ x: gridX, y: gridY });
 
                 const isTarget = targets.some(t => t.x === gridX && t.y === gridY);
 
                 if (isTarget) {
-                handleHit(gridX, gridY);
+                    handleHit(gridX, gridY);
                 } else {
-                handleMiss();
+                    handleMiss();
                 }
             };
 
@@ -314,13 +389,13 @@
                 setFoundPoints(newFound);
 
                 if (newFound.length === targets.length) {
-                setFeedback('correct');
-                setScore(s => s + (mode === 'line' ? 20 : 10));
-                setStreak(s => s + 1);
-                setShowConfetti(true);
-                setTimeout(() => generateNewTarget(), 2000);
+                    setFeedback('correct');
+                    setScore(s => s + (mode === 'line' ? 20 : 10));
+                    setStreak(s => s + 1);
+                    setShowConfetti(true);
+                    setTimeout(() => generateNewTarget(), 2000);
                 } else {
-                setFeedback('partial');
+                    setFeedback('partial');
                 }
             };
 
@@ -329,162 +404,147 @@
                 setStreak(0);
             };
 
+            // Button Base Class
+            const btnBase = "flex items-center gap-2 px-4 py-2 rounded-full font-bold text-sm transition-all border shadow-sm";
+            const btnActive = "bg-sage text-white border-sage shadow-md";
+            const btnInactive = "bg-white text-stone border-gray-200 hover:border-sage hover:text-sage";
+
             return (
-                <div className="min-h-screen bg-blue-50 p-2 md:p-4 font-sans text-slate-800 flex flex-col items-center">
+                <div className="bg-white/80 backdrop-blur-sm p-4 md:p-8 rounded-3xl shadow-soft border border-black/5 w-full flex flex-col items-center">
                 
-                {/* Header */}
-                <header className="w-full max-w-2xl flex flex-col gap-4 bg-white p-4 rounded-xl shadow-sm mb-4">
-                    <div className="flex justify-between items-center">
+                    {/* Header */}
+                    <header className="w-full flex flex-col md:flex-row justify-between items-center mb-6 gap-6">
                         <div>
-                        <h1 className="text-xl md:text-2xl font-bold text-blue-600 flex items-center gap-2">
-                            <Target className="w-6 h-6" />
-                            Grid Master
-                        </h1>
-                        <p className="text-slate-500 text-xs md:text-sm">Coordinate Geometry Practice</p>
+                            <h1 className="text-3xl font-serif font-bold text-stone flex items-center gap-2">
+                                <span className="p-2 bg-sage/10 rounded-xl text-sage">
+                                    <Target className="w-6 h-6" />
+                                </span>
+                                Coordinate Atelier
+                            </h1>
+                            <p className="text-pebble text-sm mt-1 ml-1">An inquiry into points & lines</p>
                         </div>
 
-                        <div className="flex gap-3 md:gap-6">
-                            <div className="text-center">
-                                <div className="text-[10px] md:text-xs uppercase tracking-wider text-slate-400 font-bold">Streak</div>
-                                <div className="text-lg md:text-xl font-bold text-orange-500 flex items-center justify-center gap-1">
-                                <Trophy className="w-4 h-4" /> {streak}
+                        <div className="flex gap-4">
+                            <div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center min-w-[80px]">
+                                <div className="text-[10px] uppercase tracking-widest text-pebble font-bold">Streak</div>
+                                <div className="text-xl font-bold text-clay flex items-center justify-center gap-1">
+                                    <Trophy className="w-4 h-4" /> {streak}
                                 </div>
                             </div>
-                            <div className="text-center">
-                                <div className="text-[10px] md:text-xs uppercase tracking-wider text-slate-400 font-bold">Score</div>
-                                <div className="text-lg md:text-xl font-bold text-slate-700">{score}</div>
+                            <div className="bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm text-center min-w-[80px]">
+                                <div className="text-[10px] uppercase tracking-widest text-pebble font-bold">Score</div>
+                                <div className="text-xl font-bold text-stone">{score}</div>
                             </div>
                         </div>
-                    </div>
+                    </header>
 
                     {/* Controls Row */}
-                    <div className="flex flex-col md:flex-row gap-2 justify-between border-t pt-3">
-                        {/* Mode Selector */}
-                        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg self-start">
+                    <div className="w-full flex flex-wrap gap-4 justify-center md:justify-between mb-6">
+                        {/* Mode */}
+                        <div className="flex bg-sage-light/50 p-1.5 rounded-full">
                             <button 
                                 onClick={() => { setMode('point'); generateNewTarget(); }}
-                                className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all ${mode === 'point' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${mode === 'point' ? 'bg-white text-sage shadow-sm' : 'text-pebble hover:text-stone'}`}
                             >
                                 Points
                             </button>
                             <button 
                                 onClick={() => { setMode('line'); generateNewTarget(); }}
-                                className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all ${mode === 'line' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`px-4 py-1.5 rounded-full text-sm font-bold transition-all ${mode === 'line' ? 'bg-white text-sage shadow-sm' : 'text-pebble hover:text-stone'}`}
                             >
                                 Lines
                             </button>
                         </div>
 
-                        {/* Quadrant Selector */}
-                        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg self-start">
+                        {/* Quadrants */}
+                        <div className="flex gap-2">
                             <button 
                                 onClick={() => { setQuadrantMode('1'); generateNewTarget(); }}
-                                className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all flex items-center gap-2 ${quadrantMode === '1' ? 'bg-white shadow text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`${btnBase} ${quadrantMode === '1' ? btnActive : btnInactive}`}
                             >
-                                <Grid className="w-3 h-3" /> Positive Only
+                                <GridIcon className="w-4 h-4" /> Positive
                             </button>
                             <button 
                                 onClick={() => { setQuadrantMode('4'); generateNewTarget(); }}
-                                className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all flex items-center gap-2 ${quadrantMode === '4' ? 'bg-white shadow text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`${btnBase} ${quadrantMode === '4' ? btnActive : btnInactive}`}
                             >
-                                <Maximize className="w-3 h-3" /> All Quadrants
+                                <Maximize className="w-4 h-4" /> Full Grid
                             </button>
                         </div>
                     </div>
-                </header>
 
-                {/* Main Game Card */}
-                <div className="bg-white p-2 rounded-2xl shadow-lg w-full max-w-2xl flex flex-col items-center relative overflow-hidden">
-                    
-                    {/* Instruction Banner */}
-                    <div className={`w-full p-3 md:p-4 mb-2 rounded-xl flex flex-col items-center justify-center transition-colors duration-300
-                    ${feedback === 'correct' ? 'bg-green-100' : feedback === 'incorrect' ? 'bg-red-100' : 'bg-blue-100'}`}>
-                    
-                    <div className="text-slate-600 text-xs md:text-sm font-semibold uppercase tracking-wide mb-1">
-                        {mode === 'point' ? 'Find this location' : 'Plot these endpoints'}
-                    </div>
-                    
-                    <div className="text-2xl md:text-4xl font-black text-slate-800 tracking-tight flex flex-wrap justify-center items-center gap-2 md:gap-4">
-                        {targets.map((t, i) => {
-                        const isFound = foundPoints.some(p => p.x === t.x && p.y === t.y);
-                        return (
-                            <div key={i} className={`flex items-center transition-opacity ${isFound ? 'opacity-40' : 'opacity-100'}`}>
-                                    <span className="text-blue-600">({t.x}, {t.y})</span>
-                                    {i < targets.length - 1 && <span className="text-slate-400 text-lg md:text-xl font-normal ml-2 md:ml-4">and</span>}
+                    {/* Game Area */}
+                    <div className="w-full max-w-2xl relative">
+                        
+                        {/* Prompt / Feedback Banner */}
+                        <div className={`
+                            absolute top-4 left-1/2 -translate-x-1/2 z-10 
+                            bg-white/95 backdrop-blur shadow-soft border border-gray-100
+                            px-8 py-4 rounded-2xl flex flex-col items-center justify-center
+                            transition-all duration-300 transform
+                            ${feedback ? 'scale-105' : 'scale-100'}
+                        `}>
+                            <div className="text-pebble text-xs font-bold uppercase tracking-widest mb-1">
+                                {mode === 'point' ? 'Locate' : 'Connect'}
                             </div>
-                        )
-                        })}
-                    </div>
+                            
+                            <div className="text-3xl font-serif font-bold text-stone flex gap-3 items-center">
+                                {targets.map((t, i) => {
+                                    const isFound = foundPoints.some(p => p.x === t.x && p.y === t.y);
+                                    return (
+                                        <div key={i} className={`flex items-center ${isFound ? 'text-sage opacity-50' : 'text-stone'}`}>
+                                            <span>({t.x}, {t.y})</span>
+                                            {i < targets.length - 1 && <span className="text-pebble font-light mx-2 text-xl">&</span>}
+                                        </div>
+                                    )
+                                })}
+                            </div>
 
-                    {/* Feedback Message */}
-                    <div className="h-6 mt-1 md:mt-2 text-center">
-                        {feedback === 'correct' && (
-                        <span className="text-green-600 font-bold text-sm md:text-base flex items-center justify-center gap-1 animate-bounce">
-                            <Check className="w-4 h-4 md:w-5 md:h-5" /> Excellent!
-                        </span>
-                        )}
-                        {feedback === 'incorrect' && (
-                        <span className="text-red-500 font-bold text-sm md:text-base flex items-center justify-center gap-1">
-                            <X className="w-4 h-4 md:w-5 md:h-5" /> Incorrect. Clicked ({clickedPoint?.x}, {clickedPoint?.y})
-                        </span>
-                        )}
-                        {feedback === 'partial' && (
-                        <span className="text-blue-600 font-bold text-sm md:text-base flex items-center justify-center gap-1">
-                            <Check className="w-4 h-4" /> Good! Next point.
-                        </span>
-                        )}
-                        {!feedback && (
-                        <span className="text-blue-400 text-xs md:text-sm flex items-center justify-center gap-1">
-                            <Info className="w-3 h-3 md:w-4 md:h-4" /> Tap the intersection
-                        </span>
-                        )}
-                    </div>
-                    </div>
-
-                    {/* Canvas Container */}
-                    <div className="relative w-full aspect-square max-w-[500px] cursor-crosshair">
-                    <canvas
-                        ref={canvasRef}
-                        width={600}
-                        height={600}
-                        onClick={handleCanvasClick}
-                        className="w-full h-full touch-none select-none rounded-lg border border-slate-100"
-                        style={{ touchAction: 'none' }}
-                    />
-                    </div>
-
-                    {/* Controls */}
-                    <div className="w-full border-t p-4 mt-2 flex justify-between items-center">
-                        <div className="text-xs text-slate-400 hidden md:block">
-                        Remember: <b>X</b> is across, <b>Y</b> is up/down.
+                            {/* Status Text */}
+                            <div className="mt-2 text-sm font-bold h-5">
+                                {feedback === 'correct' && <span className="text-sage flex items-center gap-1"><Check className="w-4 h-4"/> Beautiful!</span>}
+                                {feedback === 'incorrect' && <span className="text-clay flex items-center gap-1"><X className="w-4 h-4"/> Not quite ({clickedPoint?.x}, {clickedPoint?.y})</span>}
+                                {feedback === 'partial' && <span className="text-sage flex items-center gap-1">One more to go...</span>}
+                                {!feedback && <span className="text-pebble font-normal">Tap the intersection</span>}
+                            </div>
                         </div>
-                        <button 
-                        onClick={generateNewTarget}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors ml-auto md:ml-0 text-sm"
-                        >
-                        <RefreshCw className="w-4 h-4" />
-                        Skip
-                        </button>
+
+                        {/* Canvas */}
+                        <div className="relative w-full aspect-square bg-white rounded-3xl shadow-inner border border-black/5 overflow-hidden">
+                            <canvas
+                                ref={canvasRef}
+                                width={800}
+                                height={800}
+                                onClick={handleCanvasClick}
+                                className="w-full h-full touch-none cursor-crosshair"
+                                style={{ touchAction: 'none' }}
+                            />
+                        </div>
+
+                        {/* Footer Controls */}
+                        <div className="mt-4 flex justify-between items-center px-2">
+                             <div className="flex gap-2">
+                                {[5, 10, 20].map(size => (
+                                    <button 
+                                        key={size}
+                                        onClick={() => setGridSize(size)}
+                                        className={`w-8 h-8 rounded-full text-xs font-bold border transition-colors
+                                            ${gridSize === size ? 'bg-stone text-white border-stone' : 'bg-white text-pebble border-gray-200 hover:border-stone'}
+                                        `}
+                                    >
+                                        {size}
+                                    </button>
+                                ))}
+                             </div>
+
+                             <button 
+                                onClick={generateNewTarget}
+                                className="text-stone hover:text-sage font-bold text-sm flex items-center gap-2 px-4 py-2 rounded-full hover:bg-sage-light/50 transition-colors"
+                             >
+                                <RefreshCw className="w-4 h-4" /> Skip Challenge
+                             </button>
+                        </div>
                     </div>
-
-                </div>
-
-                {/* Grid Settings */}
-                <div className="mt-8 text-center">
-                    <p className="text-slate-400 text-xs mb-2">Teacher Controls: Grid Size</p>
-                    <div className="flex gap-2 justify-center">
-                        {[5, 10, 20].map(size => (
-                            <button 
-                            key={size}
-                            onClick={() => setGridSize(size)}
-                            className={`px-3 py-1 text-xs rounded-full border transition-colors ${gridSize === size ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-300 hover:border-slate-400'}`}
-                            >
-                            {size}x{size}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
                 </div>
             );
         };
