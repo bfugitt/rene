@@ -127,10 +127,13 @@
         const Maximize = ({ className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
         );
+        const Polygon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 2l8.5 5-3.5 10h-10L3.5 7z"/></svg>
+        );
 
         // --- Main Component ---
         const CoordinateGame = () => {
-            const [mode, setMode] = useState('point'); // 'point' or 'line'
+            const [mode, setMode] = useState('point'); // 'point' | 'line' | 'shape'
             const [quadrantMode, setQuadrantMode] = useState('1'); // '1' (Positive only) or '4' (All quadrants)
             
             const [targets, setTargets] = useState([{ x: 0, y: 0 }]); // Array of points to find
@@ -158,6 +161,45 @@
                 }
             }, [quadrantMode, gridSize]);
 
+            // --- Shape Generators ---
+            // Returns an array of points for a shape centered roughly at (cx, cy)
+            const generateShape = (cx, cy, type) => {
+                const points = [];
+                // Scale factor for shapes based on grid size (keep them visible but fitting)
+                const s = Math.max(2, Math.floor(gridSize / 4)); 
+
+                switch (type) {
+                    case 'square':
+                        points.push({ x: cx - s, y: cy - s });
+                        points.push({ x: cx + s, y: cy - s });
+                        points.push({ x: cx + s, y: cy + s });
+                        points.push({ x: cx - s, y: cy + s });
+                        break;
+                    case 'rectangle':
+                        const w = s + 1;
+                        const h = s - 1;
+                        points.push({ x: cx - w, y: cy - h });
+                        points.push({ x: cx + w, y: cy - h });
+                        points.push({ x: cx + w, y: cy + h });
+                        points.push({ x: cx - w, y: cy + h });
+                        break;
+                    case 'triangle': // Isosceles
+                        points.push({ x: cx, y: cy + s }); // Top
+                        points.push({ x: cx + s, y: cy - s }); // Bottom Right
+                        points.push({ x: cx - s, y: cy - s }); // Bottom Left
+                        break;
+                    case 'diamond':
+                        points.push({ x: cx, y: cy + s });
+                        points.push({ x: cx + s, y: cy });
+                        points.push({ x: cx, y: cy - s });
+                        points.push({ x: cx - s, y: cy });
+                        break;
+                    default:
+                        break;
+                }
+                return points;
+            };
+
             // Generate new challenge
             const generateNewTarget = useCallback(() => {
                 setFeedback(null);
@@ -166,23 +208,49 @@
                 setFoundPoints([]);
 
                 const { min, max } = getRange();
-                const range = max - min;
-
-                const getRandomCoord = () => Math.floor(Math.random() * (range + 1)) + min;
-
-                const generatePoint = () => ({ x: getRandomCoord(), y: getRandomCoord() });
+                
+                // Helper to get random coord within margins
+                // We add margin so shapes don't spawn half off-screen
+                const getSafeCoord = (margin = 0) => {
+                    const safeMin = min + margin;
+                    const safeMax = max - margin;
+                    return Math.floor(Math.random() * (safeMax - safeMin + 1)) + safeMin;
+                };
 
                 if (mode === 'point') {
-                    setTargets([generatePoint()]);
-                } else {
-                    const p1 = generatePoint();
-                    let p2 = generatePoint();
-                    while (p1.x === p2.x && p1.y === p2.y) {
-                        p2 = generatePoint();
-                    }
+                    setTargets([{ x: getSafeCoord(), y: getSafeCoord() }]);
+                } else if (mode === 'line') {
+                    const p1 = { x: getSafeCoord(), y: getSafeCoord() };
+                    let p2 = { x: getSafeCoord(), y: getSafeCoord() };
+                    while (p1.x === p2.x && p1.y === p2.y) p2 = { x: getSafeCoord(), y: getSafeCoord() };
                     setTargets([p1, p2]);
+                } else if (mode === 'shape') {
+                    const shapeTypes = ['square', 'rectangle', 'triangle', 'diamond'];
+                    const type = shapeTypes[Math.floor(Math.random() * shapeTypes.length)];
+                    
+                    // Try to find a valid placement
+                    let validPoints = null;
+                    let attempts = 0;
+                    
+                    while (!validPoints && attempts < 20) {
+                        const margin = Math.ceil(gridSize / 3);
+                        const cx = getSafeCoord(margin);
+                        const cy = getSafeCoord(margin);
+                        const candidatePoints = generateShape(cx, cy, type);
+                        
+                        // Check bounds
+                        const isOutOfBounds = candidatePoints.some(p => p.x < min || p.x > max || p.y < min || p.y > max);
+                        if (!isOutOfBounds) {
+                            validPoints = candidatePoints;
+                        }
+                        attempts++;
+                    }
+                    
+                    // Fallback to simple points if shape generation fails (rare)
+                    setTargets(validPoints || [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 1, y: 2 }]);
                 }
-            }, [getRange, mode]);
+
+            }, [getRange, mode, gridSize]);
 
             // Initial load & Mode change triggers
             useEffect(() => {
@@ -234,7 +302,7 @@
                     const shouldShowLabel = Math.abs(i) % (gridSize >= 20 && quadrantMode === '4' ? 5 : 1) === 0;
                     
                     if (shouldShowLabel) {
-                        ctx.fillStyle = isAxis ? COLOR_AXIS : '#A8B5BA'; // Pebble for non-axis labels
+                        ctx.fillStyle = isAxis ? COLOR_AXIS : '#A8B5BA';
                         ctx.font = isAxis ? 'bold 14px Lato' : '14px Lato';
                         if (!(i === 0 && quadrantMode === '4')) {
                             ctx.fillText(i.toString(), xPixel, CANVAS_SIZE - PADDING + 25);
@@ -260,7 +328,7 @@
                     }
                 }
                 
-                // Draw "0" explicitly for origin in 4-quadrant mode
+                // Draw "0" explicitly
                 if (quadrantMode === '4') {
                     const originX = toPixelX(0);
                     const originY = toPixelY(0);
@@ -297,7 +365,7 @@
                     ctx.fillText(`(${p.x}, ${p.y})`, px, py - 25);
                 });
 
-                // 2. Line
+                // 2. Lines / Shapes
                 if (mode === 'line' && foundPoints.length === 2) {
                     const p1 = foundPoints[0];
                     const p2 = foundPoints[1];
@@ -307,6 +375,25 @@
                     ctx.strokeStyle = COLOR_SUCCESS;
                     ctx.lineWidth = 5;
                     ctx.lineCap = 'round';
+                    ctx.stroke();
+                } 
+                else if (mode === 'shape' && feedback === 'correct') {
+                    // Draw completed filled shape
+                    ctx.beginPath();
+                    const pStart = targets[0];
+                    ctx.moveTo(toPixelX(pStart.x), toPixelY(pStart.y));
+                    for (let i = 1; i < targets.length; i++) {
+                        ctx.lineTo(toPixelX(targets[i].x), toPixelY(targets[i].y));
+                    }
+                    ctx.closePath();
+                    
+                    // Fill style
+                    ctx.fillStyle = 'rgba(124, 144, 130, 0.2)'; // Sage with opacity
+                    ctx.fill();
+                    
+                    ctx.strokeStyle = COLOR_SUCCESS;
+                    ctx.lineWidth = 5;
+                    ctx.lineJoin = 'round';
                     ctx.stroke();
                 }
 
@@ -327,7 +414,7 @@
                     ctx.fillText(`(${clickedPoint.x}, ${clickedPoint.y})`, px, py - 25);
                 }
                 
-                // 4. Confetti (Reggio Style Colors)
+                // 4. Confetti
                 if (showConfetti) {
                     const confettiColors = [COLOR_SUCCESS, COLOR_ERROR, '#A8B5BA', '#4A4A4A'];
                     for(let k=0; k<50; k++) {
@@ -353,11 +440,9 @@
                 const canvas = canvasRef.current;
                 const rect = canvas.getBoundingClientRect();
                 
-                // Calculate scale factors
                 const scaleX = CANVAS_SIZE / rect.width;
                 const scaleY = CANVAS_SIZE / rect.height;
                 
-                // Get click position relative to the canvas element
                 const clickX = (e.clientX - rect.left) * scaleX;
                 const clickY = (e.clientY - rect.top) * scaleY;
 
@@ -366,17 +451,18 @@
                 const graphWidth = CANVAS_SIZE - (PADDING * 2);
                 const spacing = graphWidth / totalUnits;
 
-                // Convert pixels to grid units
                 let gridX = Math.round(((clickX - PADDING) / spacing) + min);
                 let gridY = Math.round((((CANVAS_SIZE - PADDING) - clickY) / spacing) + min);
 
                 gridX = Math.max(min, Math.min(max, gridX));
                 gridY = Math.max(min, Math.min(max, gridY));
 
+                // If already found, ignore
                 if (foundPoints.some(p => p.x === gridX && p.y === gridY)) return; 
 
                 setClickedPoint({ x: gridX, y: gridY });
 
+                // Check if this point is in the target list
                 const isTarget = targets.some(t => t.x === gridX && t.y === gridY);
 
                 if (isTarget) {
@@ -392,10 +478,10 @@
 
                 if (newFound.length === targets.length) {
                     setFeedback('correct');
-                    setScore(s => s + (mode === 'line' ? 20 : 10));
+                    setScore(s => s + (mode === 'shape' ? 50 : mode === 'line' ? 20 : 10));
                     setStreak(s => s + 1);
                     setShowConfetti(true);
-                    setTimeout(() => generateNewTarget(), 2000);
+                    setTimeout(() => generateNewTarget(), 2500); // Longer delay to admire the shape
                 } else {
                     setFeedback('partial');
                 }
@@ -414,7 +500,7 @@
             return (
                 <div className="bg-white/80 backdrop-blur-sm p-4 md:p-6 lg:p-8 rounded-3xl shadow-soft border border-black/5 w-full flex flex-col md:flex-row gap-6 md:gap-8 items-stretch md:items-start min-h-[500px]">
                 
-                    {/* Left Sidebar: Controls (Becomes Top on Mobile) */}
+                    {/* Left Sidebar: Controls */}
                     <div className="flex-1 flex flex-col gap-4 md:gap-6 min-w-[240px]">
                         
                         {/* Header Section */}
@@ -425,7 +511,7 @@
                                 </span>
                                 Coordinate Atelier
                             </h1>
-                            <p className="text-pebble text-sm mt-1 ml-1">An inquiry into points & lines</p>
+                            <p className="text-pebble text-sm mt-1 ml-1">An inquiry into points, lines & shapes</p>
                         </div>
 
                         {/* Scoreboard */}
@@ -450,15 +536,21 @@
                             <div className="flex bg-sage-light/50 p-1.5 rounded-2xl">
                                 <button 
                                     onClick={() => { setMode('point'); generateNewTarget(); }}
-                                    className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-all ${mode === 'point' ? 'bg-white text-sage shadow-sm' : 'text-pebble hover:text-stone'}`}
+                                    className={`flex-1 px-2 py-2 rounded-xl text-xs md:text-sm font-bold transition-all ${mode === 'point' ? 'bg-white text-sage shadow-sm' : 'text-pebble hover:text-stone'}`}
                                 >
                                     Points
                                 </button>
                                 <button 
                                     onClick={() => { setMode('line'); generateNewTarget(); }}
-                                    className={`flex-1 px-4 py-2 rounded-xl text-sm font-bold transition-all ${mode === 'line' ? 'bg-white text-sage shadow-sm' : 'text-pebble hover:text-stone'}`}
+                                    className={`flex-1 px-2 py-2 rounded-xl text-xs md:text-sm font-bold transition-all ${mode === 'line' ? 'bg-white text-sage shadow-sm' : 'text-pebble hover:text-stone'}`}
                                 >
                                     Lines
+                                </button>
+                                <button 
+                                    onClick={() => { setMode('shape'); generateNewTarget(); }}
+                                    className={`flex-1 px-2 py-2 rounded-xl text-xs md:text-sm font-bold transition-all ${mode === 'shape' ? 'bg-white text-sage shadow-sm' : 'text-pebble hover:text-stone'}`}
+                                >
+                                    Shapes
                                 </button>
                             </div>
                         </div>
@@ -522,7 +614,7 @@
                             ${feedback ? 'ring-2 ring-sage/20' : ''}
                         `}>
                             <div className="text-pebble text-xs font-bold uppercase tracking-widest mb-1">
-                                {mode === 'point' ? 'Locate' : 'Connect'}
+                                {mode === 'point' ? 'Locate' : mode === 'line' ? 'Connect' : 'Construct Shape'}
                             </div>
                             
                             <div className="text-3xl font-serif font-bold text-stone flex gap-3 items-center flex-wrap justify-center">
@@ -541,22 +633,13 @@
                             <div className="mt-2 text-sm font-bold h-5">
                                 {feedback === 'correct' && <span className="text-sage flex items-center gap-1"><Check className="w-4 h-4"/> Beautiful!</span>}
                                 {feedback === 'incorrect' && <span className="text-clay flex items-center gap-1"><X className="w-4 h-4"/> Not quite ({clickedPoint?.x}, {clickedPoint?.y})</span>}
-                                {feedback === 'partial' && <span className="text-sage flex items-center gap-1">One more to go...</span>}
-                                {!feedback && <span className="text-pebble font-normal">Tap the intersection</span>}
+                                {feedback === 'partial' && <span className="text-sage flex items-center gap-1">Continue...</span>}
+                                {!feedback && <span className="text-pebble font-normal">Tap the intersections</span>}
                             </div>
                         </div>
 
-                        {/* Canvas Container Update:
-                            - Removed 'aspect-square' from container to allow flexibility in layout
-                            - Added centering flex properties
-                            - Canvas itself now handles aspect ratio
-                        */}
+                        {/* Canvas Container */}
                         <div className="w-full h-full flex items-center justify-center min-h-[300px] flex-1">
-                             {/* Canvas Element Update:
-                                - Removed 'w-full h-full object-contain'
-                                - Added 'max-w-full max-h-full aspect-square'
-                                - This ensures the canvas ELEMENT is square, removing letterboxing issues
-                             */}
                             <canvas
                                 ref={canvasRef}
                                 width={800}
