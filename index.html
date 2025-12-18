@@ -1,441 +1,496 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Trophy, RefreshCw, Check, X, Target, Info, Grid, Maximize } from 'lucide-react';
-
-const CoordinateGame = () => {
-  const [mode, setMode] = useState('point'); // 'point' or 'line'
-  const [quadrantMode, setQuadrantMode] = useState('1'); // '1' (Positive only) or '4' (All quadrants)
-  
-  const [targets, setTargets] = useState([{ x: 0, y: 0 }]); // Array of points to find
-  const [foundPoints, setFoundPoints] = useState([]); // Points correctly found this round
-  
-  const [score, setScore] = useState(0);
-  const [streak, setStreak] = useState(0);
-  const [feedback, setFeedback] = useState(null); // 'correct', 'incorrect', 'partial', or null
-  const [clickedPoint, setClickedPoint] = useState(null); // Last clicked point (for error display)
-  const [gridSize, setGridSize] = useState(10); 
-  const [showConfetti, setShowConfetti] = useState(false);
-
-  const canvasRef = useRef(null);
-
-  // Layout constants
-  const PADDING = 40;
-  const CANVAS_SIZE = 600;
-
-  // Calculate range based on settings
-  const getRange = useCallback(() => {
-    if (quadrantMode === '1') {
-      return { min: 0, max: gridSize };
-    } else {
-      return { min: -gridSize, max: gridSize };
-    }
-  }, [quadrantMode, gridSize]);
-
-  // Generate new challenge
-  const generateNewTarget = useCallback(() => {
-    setFeedback(null);
-    setClickedPoint(null);
-    setShowConfetti(false);
-    setFoundPoints([]);
-
-    const { min, max } = getRange();
-    const range = max - min;
-
-    const getRandomCoord = () => Math.floor(Math.random() * (range + 1)) + min;
-
-    // Helper to avoid generating (0,0) too often or same points
-    const generatePoint = () => ({ x: getRandomCoord(), y: getRandomCoord() });
-
-    if (mode === 'point') {
-      setTargets([generatePoint()]);
-    } else {
-      // Line mode: generate 2 distinct points
-      const p1 = generatePoint();
-      let p2 = generatePoint();
-      // Ensure they aren't the same point
-      while (p1.x === p2.x && p1.y === p2.y) {
-        p2 = generatePoint();
-      }
-      setTargets([p1, p2]);
-    }
-  }, [getRange, mode]);
-
-  // Initial load & Mode change triggers
-  useEffect(() => {
-    generateNewTarget();
-  }, [generateNewTarget]);
-
-  // Handle Canvas Drawing
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Master - Coordinate Practice</title>
     
-    // Clear canvas
-    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
-    const { min, max } = getRange();
-    const totalUnits = max - min;
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
-    const graphWidth = CANVAS_SIZE - (PADDING * 2);
-    const spacing = graphWidth / totalUnits;
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    // Helper: Coordinate Value -> Pixel Location
-    const toPixelX = (x) => PADDING + ((x - min) * spacing);
-    const toPixelY = (y) => (CANVAS_SIZE - PADDING) - ((y - min) * spacing);
-
-    // --- Draw Grid ---
-    ctx.font = '12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    for (let i = min; i <= max; i++) {
-      // Don't draw lines for every single unit if grid is huge (e.g. 20x20 in 4 quadrants = 40 lines)
-      // For now, standard 10x10 is fine.
-      
-      const isAxis = i === 0;
-      
-      // Vertical lines (X varies, draws at X=i)
-      const xPixel = toPixelX(i);
-      ctx.beginPath();
-      ctx.strokeStyle = isAxis ? '#000' : '#e5e7eb';
-      ctx.lineWidth = isAxis ? 3 : 1;
-      ctx.moveTo(xPixel, PADDING);
-      ctx.lineTo(xPixel, CANVAS_SIZE - PADDING);
-      ctx.stroke();
-
-      // X Axis Labels
-      // Only draw labels for even numbers if it gets too crowded, or all for standard
-      if (Math.abs(i) % (gridSize >= 20 && quadrantMode === '4' ? 5 : 1) === 0) {
-        ctx.fillStyle = isAxis ? '#000' : '#6b7280';
-        ctx.font = isAxis ? 'bold 12px sans-serif' : '12px sans-serif';
-        // Adjust label position if it's the axis origin to avoid overlap
-        if (!(i === 0 && quadrantMode === '4')) {
-           ctx.fillText(i.toString(), xPixel, CANVAS_SIZE - PADDING + 20);
+    <style>
+        body {
+            touch-action: pan-y;
         }
-      }
+    </style>
+</head>
+<body class="bg-blue-50">
+    <div id="root"></div>
 
-      // Horizontal lines (Y varies, draws at Y=i)
-      const yPixel = toPixelY(i);
-      ctx.beginPath();
-      ctx.strokeStyle = isAxis ? '#000' : '#e5e7eb';
-      ctx.lineWidth = isAxis ? 3 : 1;
-      ctx.moveTo(PADDING, yPixel);
-      ctx.lineTo(CANVAS_SIZE - PADDING, yPixel);
-      ctx.stroke();
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useCallback } = React;
 
-      // Y Axis Labels
-      if (Math.abs(i) % (gridSize >= 20 && quadrantMode === '4' ? 5 : 1) === 0) {
-        ctx.fillStyle = isAxis ? '#000' : '#6b7280';
-        ctx.font = isAxis ? 'bold 12px sans-serif' : '12px sans-serif';
-        if (!(i === 0 && quadrantMode === '4')) {
-            ctx.fillText(i.toString(), PADDING - 20, yPixel);
-        }
-      }
-    }
-    
-    // Draw "0" explicitly for origin in 4-quadrant mode
-    if (quadrantMode === '4') {
-        const originX = toPixelX(0);
-        const originY = toPixelY(0);
-        ctx.fillStyle = '#000';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillText("0", originX - 12, originY + 12);
-    }
+        // --- Icons (Inline SVGs to avoid dependencies) ---
+        const Trophy = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+        );
+        const RefreshCw = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
+        );
+        const Check = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 6 9 17 4 12"/></svg>
+        );
+        const X = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 18 18"/></svg>
+        );
+        const Target = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        );
+        const Info = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        );
+        const Grid = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>
+        );
+        const Maximize = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        );
 
-    // Axis Titles (X and Y arrows)
-    ctx.save();
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillStyle = '#000';
-    // X Label
-    ctx.fillText('X', CANVAS_SIZE - 15, toPixelY(0) - 15);
-    // Y Label
-    ctx.fillText('Y', toPixelX(0) + 15, PADDING - 10);
-    ctx.restore();
+        // --- Main Component ---
+        const CoordinateGame = () => {
+            const [mode, setMode] = useState('point'); // 'point' or 'line'
+            const [quadrantMode, setQuadrantMode] = useState('1'); // '1' (Positive only) or '4' (All quadrants)
+            
+            const [targets, setTargets] = useState([{ x: 0, y: 0 }]); // Array of points to find
+            const [foundPoints, setFoundPoints] = useState([]); // Points correctly found this round
+            
+            const [score, setScore] = useState(0);
+            const [streak, setStreak] = useState(0);
+            const [feedback, setFeedback] = useState(null); // 'correct', 'incorrect', 'partial', or null
+            const [clickedPoint, setClickedPoint] = useState(null); // Last clicked point (for error display)
+            const [gridSize, setGridSize] = useState(10); 
+            const [showConfetti, setShowConfetti] = useState(false);
 
-    // --- Draw Game Elements ---
+            const canvasRef = useRef(null);
 
-    // 1. Draw Correctly Found Points
-    foundPoints.forEach(p => {
-      const px = toPixelX(p.x);
-      const py = toPixelY(p.y);
-      ctx.beginPath();
-      ctx.arc(px, py, 8, 0, 2 * Math.PI);
-      ctx.fillStyle = '#22c55e'; // Green
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      
-      // Label
-      ctx.fillStyle = '#166534';
-      ctx.font = 'bold 14px sans-serif';
-      // Adjust label position to not cover the point or line
-      ctx.fillText(`(${p.x}, ${p.y})`, px, py - 20);
-    });
+            // Layout constants
+            const PADDING = 40;
+            const CANVAS_SIZE = 600;
 
-    // 2. Draw Line if Mode is 'line' and complete
-    if (mode === 'line' && foundPoints.length === 2) {
-      const p1 = foundPoints[0];
-      const p2 = foundPoints[1];
-      ctx.beginPath();
-      ctx.moveTo(toPixelX(p1.x), toPixelY(p1.y));
-      ctx.lineTo(toPixelX(p2.x), toPixelY(p2.y));
-      ctx.strokeStyle = '#22c55e';
-      ctx.lineWidth = 4;
-      ctx.stroke();
-    }
+            // Calculate range based on settings
+            const getRange = useCallback(() => {
+                if (quadrantMode === '1') {
+                return { min: 0, max: gridSize };
+                } else {
+                return { min: -gridSize, max: gridSize };
+                }
+            }, [quadrantMode, gridSize]);
 
-    // 3. Draw Wrong Click (if any)
-    if (clickedPoint && feedback === 'incorrect') {
-      const px = toPixelX(clickedPoint.x);
-      const py = toPixelY(clickedPoint.y);
-      ctx.beginPath();
-      ctx.arc(px, py, 8, 0, 2 * Math.PI);
-      ctx.fillStyle = '#ef4444'; // Red
-      ctx.fill();
-      ctx.strokeStyle = '#fff';
-      ctx.lineWidth = 2;
-      ctx.stroke();
-      
-      ctx.fillStyle = '#991b1b';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillText(`(${clickedPoint.x}, ${clickedPoint.y})`, px, py - 20);
-    }
-    
-    // 4. Confetti
-    if (showConfetti) {
-      for(let k=0; k<50; k++) {
-        const cx = Math.random() * CANVAS_SIZE;
-        const cy = Math.random() * CANVAS_SIZE;
-        const r = Math.random() * 5 + 2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.fillStyle = `hsl(${Math.random() * 360}, 100%, 50%)`;
-        ctx.fill();
-      }
-    }
+            // Generate new challenge
+            const generateNewTarget = useCallback(() => {
+                setFeedback(null);
+                setClickedPoint(null);
+                setShowConfetti(false);
+                setFoundPoints([]);
 
-  }, [targets, foundPoints, clickedPoint, feedback, gridSize, showConfetti, mode, quadrantMode, getRange]);
+                const { min, max } = getRange();
+                const range = max - min;
 
-  // Handle Click
-  const handleCanvasClick = (e) => {
-    if (feedback === 'correct') return;
+                const getRandomCoord = () => Math.floor(Math.random() * (range + 1)) + min;
 
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = CANVAS_SIZE / rect.width;
-    const scaleY = CANVAS_SIZE / rect.height;
-    const clickX = (e.clientX - rect.left) * scaleX;
-    const clickY = (e.clientY - rect.top) * scaleY;
+                // Helper to avoid generating (0,0) too often or same points
+                const generatePoint = () => ({ x: getRandomCoord(), y: getRandomCoord() });
 
-    const { min, max } = getRange();
-    const totalUnits = max - min;
-    const graphWidth = CANVAS_SIZE - (PADDING * 2);
-    const spacing = graphWidth / totalUnits;
+                if (mode === 'point') {
+                setTargets([generatePoint()]);
+                } else {
+                // Line mode: generate 2 distinct points
+                const p1 = generatePoint();
+                let p2 = generatePoint();
+                // Ensure they aren't the same point
+                while (p1.x === p2.x && p1.y === p2.y) {
+                    p2 = generatePoint();
+                }
+                setTargets([p1, p2]);
+                }
+            }, [getRange, mode]);
 
-    // Convert pixels to grid units
-    // Formula inverse of toPixelX/Y
-    let gridX = Math.round(((clickX - PADDING) / spacing) + min);
-    let gridY = Math.round((((CANVAS_SIZE - PADDING) - clickY) / spacing) + min);
+            // Initial load & Mode change triggers
+            useEffect(() => {
+                generateNewTarget();
+            }, [generateNewTarget]);
 
-    // Clamp values
-    gridX = Math.max(min, Math.min(max, gridX));
-    gridY = Math.max(min, Math.min(max, gridY));
+            // Handle Canvas Drawing
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                
+                const { min, max } = getRange();
+                const totalUnits = max - min;
+                
+                const graphWidth = CANVAS_SIZE - (PADDING * 2);
+                const spacing = graphWidth / totalUnits;
 
-    // Check if this point was already found
-    if (foundPoints.some(p => p.x === gridX && p.y === gridY)) {
-      return; 
-    }
+                // Helper: Coordinate Value -> Pixel Location
+                const toPixelX = (x) => PADDING + ((x - min) * spacing);
+                const toPixelY = (y) => (CANVAS_SIZE - PADDING) - ((y - min) * spacing);
 
-    setClickedPoint({ x: gridX, y: gridY });
+                // --- Draw Grid ---
+                ctx.font = '12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
 
-    const isTarget = targets.some(t => t.x === gridX && t.y === gridY);
+                for (let i = min; i <= max; i++) {
+                
+                const isAxis = i === 0;
+                
+                // Vertical lines (X varies, draws at X=i)
+                const xPixel = toPixelX(i);
+                ctx.beginPath();
+                ctx.strokeStyle = isAxis ? '#000' : '#e5e7eb';
+                ctx.lineWidth = isAxis ? 3 : 1;
+                ctx.moveTo(xPixel, PADDING);
+                ctx.lineTo(xPixel, CANVAS_SIZE - PADDING);
+                ctx.stroke();
 
-    if (isTarget) {
-      handleHit(gridX, gridY);
-    } else {
-      handleMiss();
-    }
-  };
+                // X Axis Labels
+                // Only draw labels for even numbers if it gets too crowded, or all for standard
+                if (Math.abs(i) % (gridSize >= 20 && quadrantMode === '4' ? 5 : 1) === 0) {
+                    ctx.fillStyle = isAxis ? '#000' : '#6b7280';
+                    ctx.font = isAxis ? 'bold 12px sans-serif' : '12px sans-serif';
+                    // Adjust label position if it's the axis origin to avoid overlap
+                    if (!(i === 0 && quadrantMode === '4')) {
+                    ctx.fillText(i.toString(), xPixel, CANVAS_SIZE - PADDING + 20);
+                    }
+                }
 
-  const handleHit = (x, y) => {
-    const newFound = [...foundPoints, {x, y}];
-    setFoundPoints(newFound);
+                // Horizontal lines (Y varies, draws at Y=i)
+                const yPixel = toPixelY(i);
+                ctx.beginPath();
+                ctx.strokeStyle = isAxis ? '#000' : '#e5e7eb';
+                ctx.lineWidth = isAxis ? 3 : 1;
+                ctx.moveTo(PADDING, yPixel);
+                ctx.lineTo(CANVAS_SIZE - PADDING, yPixel);
+                ctx.stroke();
 
-    if (newFound.length === targets.length) {
-      setFeedback('correct');
-      setScore(s => s + (mode === 'line' ? 20 : 10));
-      setStreak(s => s + 1);
-      setShowConfetti(true);
-      setTimeout(() => generateNewTarget(), 2000);
-    } else {
-      setFeedback('partial');
-    }
-  };
+                // Y Axis Labels
+                if (Math.abs(i) % (gridSize >= 20 && quadrantMode === '4' ? 5 : 1) === 0) {
+                    ctx.fillStyle = isAxis ? '#000' : '#6b7280';
+                    ctx.font = isAxis ? 'bold 12px sans-serif' : '12px sans-serif';
+                    if (!(i === 0 && quadrantMode === '4')) {
+                        ctx.fillText(i.toString(), PADDING - 20, yPixel);
+                    }
+                }
+                }
+                
+                // Draw "0" explicitly for origin in 4-quadrant mode
+                if (quadrantMode === '4') {
+                    const originX = toPixelX(0);
+                    const originY = toPixelY(0);
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 12px sans-serif';
+                    ctx.fillText("0", originX - 12, originY + 12);
+                }
 
-  const handleMiss = () => {
-    setFeedback('incorrect');
-    setStreak(0);
-  };
+                // Axis Titles (X and Y arrows)
+                ctx.save();
+                ctx.font = 'bold 16px sans-serif';
+                ctx.fillStyle = '#000';
+                // X Label
+                ctx.fillText('X', CANVAS_SIZE - 15, toPixelY(0) - 15);
+                // Y Label
+                ctx.fillText('Y', toPixelX(0) + 15, PADDING - 10);
+                ctx.restore();
 
-  return (
-    <div className="min-h-screen bg-blue-50 p-2 md:p-4 font-sans text-slate-800 flex flex-col items-center">
-      
-      {/* Header */}
-      <header className="w-full max-w-2xl flex flex-col gap-4 bg-white p-4 rounded-xl shadow-sm mb-4">
-        <div className="flex justify-between items-center">
-            <div>
-            <h1 className="text-xl md:text-2xl font-bold text-blue-600 flex items-center gap-2">
-                <Target className="w-6 h-6" />
-                Grid Master
-            </h1>
-            <p className="text-slate-500 text-xs md:text-sm">Coordinate Geometry Practice</p>
-            </div>
+                // --- Draw Game Elements ---
 
-            <div className="flex gap-3 md:gap-6">
-                <div className="text-center">
-                    <div className="text-[10px] md:text-xs uppercase tracking-wider text-slate-400 font-bold">Streak</div>
-                    <div className="text-lg md:text-xl font-bold text-orange-500 flex items-center justify-center gap-1">
-                    <Trophy className="w-4 h-4" /> {streak}
+                // 1. Draw Correctly Found Points
+                foundPoints.forEach(p => {
+                const px = toPixelX(p.x);
+                const py = toPixelY(p.y);
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, 2 * Math.PI);
+                ctx.fillStyle = '#22c55e'; // Green
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Label
+                ctx.fillStyle = '#166534';
+                ctx.font = 'bold 14px sans-serif';
+                // Adjust label position to not cover the point or line
+                ctx.fillText(`(${p.x}, ${p.y})`, px, py - 20);
+                });
+
+                // 2. Draw Line if Mode is 'line' and complete
+                if (mode === 'line' && foundPoints.length === 2) {
+                const p1 = foundPoints[0];
+                const p2 = foundPoints[1];
+                ctx.beginPath();
+                ctx.moveTo(toPixelX(p1.x), toPixelY(p1.y));
+                ctx.lineTo(toPixelX(p2.x), toPixelY(p2.y));
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+                }
+
+                // 3. Draw Wrong Click (if any)
+                if (clickedPoint && feedback === 'incorrect') {
+                const px = toPixelX(clickedPoint.x);
+                const py = toPixelY(clickedPoint.y);
+                ctx.beginPath();
+                ctx.arc(px, py, 8, 0, 2 * Math.PI);
+                ctx.fillStyle = '#ef4444'; // Red
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                ctx.fillStyle = '#991b1b';
+                ctx.font = 'bold 14px sans-serif';
+                ctx.fillText(`(${clickedPoint.x}, ${clickedPoint.y})`, px, py - 20);
+                }
+                
+                // 4. Confetti
+                if (showConfetti) {
+                for(let k=0; k<50; k++) {
+                    const cx = Math.random() * CANVAS_SIZE;
+                    const cy = Math.random() * CANVAS_SIZE;
+                    const r = Math.random() * 5 + 2;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+                    ctx.fillStyle = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                    ctx.fill();
+                }
+                }
+
+            }, [targets, foundPoints, clickedPoint, feedback, gridSize, showConfetti, mode, quadrantMode, getRange]);
+
+            // Handle Click
+            const handleCanvasClick = (e) => {
+                if (feedback === 'correct') return;
+
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = CANVAS_SIZE / rect.width;
+                const scaleY = CANVAS_SIZE / rect.height;
+                const clickX = (e.clientX - rect.left) * scaleX;
+                const clickY = (e.clientY - rect.top) * scaleY;
+
+                const { min, max } = getRange();
+                const totalUnits = max - min;
+                const graphWidth = CANVAS_SIZE - (PADDING * 2);
+                const spacing = graphWidth / totalUnits;
+
+                // Convert pixels to grid units
+                // Formula inverse of toPixelX/Y
+                let gridX = Math.round(((clickX - PADDING) / spacing) + min);
+                let gridY = Math.round((((CANVAS_SIZE - PADDING) - clickY) / spacing) + min);
+
+                // Clamp values
+                gridX = Math.max(min, Math.min(max, gridX));
+                gridY = Math.max(min, Math.min(max, gridY));
+
+                // Check if this point was already found
+                if (foundPoints.some(p => p.x === gridX && p.y === gridY)) {
+                return; 
+                }
+
+                setClickedPoint({ x: gridX, y: gridY });
+
+                const isTarget = targets.some(t => t.x === gridX && t.y === gridY);
+
+                if (isTarget) {
+                handleHit(gridX, gridY);
+                } else {
+                handleMiss();
+                }
+            };
+
+            const handleHit = (x, y) => {
+                const newFound = [...foundPoints, {x, y}];
+                setFoundPoints(newFound);
+
+                if (newFound.length === targets.length) {
+                setFeedback('correct');
+                setScore(s => s + (mode === 'line' ? 20 : 10));
+                setStreak(s => s + 1);
+                setShowConfetti(true);
+                setTimeout(() => generateNewTarget(), 2000);
+                } else {
+                setFeedback('partial');
+                }
+            };
+
+            const handleMiss = () => {
+                setFeedback('incorrect');
+                setStreak(0);
+            };
+
+            return (
+                <div className="min-h-screen bg-blue-50 p-2 md:p-4 font-sans text-slate-800 flex flex-col items-center">
+                
+                {/* Header */}
+                <header className="w-full max-w-2xl flex flex-col gap-4 bg-white p-4 rounded-xl shadow-sm mb-4">
+                    <div className="flex justify-between items-center">
+                        <div>
+                        <h1 className="text-xl md:text-2xl font-bold text-blue-600 flex items-center gap-2">
+                            <Target className="w-6 h-6" />
+                            Grid Master
+                        </h1>
+                        <p className="text-slate-500 text-xs md:text-sm">Coordinate Geometry Practice</p>
+                        </div>
+
+                        <div className="flex gap-3 md:gap-6">
+                            <div className="text-center">
+                                <div className="text-[10px] md:text-xs uppercase tracking-wider text-slate-400 font-bold">Streak</div>
+                                <div className="text-lg md:text-xl font-bold text-orange-500 flex items-center justify-center gap-1">
+                                <Trophy className="w-4 h-4" /> {streak}
+                                </div>
+                            </div>
+                            <div className="text-center">
+                                <div className="text-[10px] md:text-xs uppercase tracking-wider text-slate-400 font-bold">Score</div>
+                                <div className="text-lg md:text-xl font-bold text-slate-700">{score}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Controls Row */}
+                    <div className="flex flex-col md:flex-row gap-2 justify-between border-t pt-3">
+                        {/* Mode Selector */}
+                        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg self-start">
+                            <button 
+                                onClick={() => { setMode('point'); generateNewTarget(); }}
+                                className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all ${mode === 'point' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Points
+                            </button>
+                            <button 
+                                onClick={() => { setMode('line'); generateNewTarget(); }}
+                                className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all ${mode === 'line' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                Lines
+                            </button>
+                        </div>
+
+                        {/* Quadrant Selector */}
+                        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg self-start">
+                            <button 
+                                onClick={() => { setQuadrantMode('1'); generateNewTarget(); }}
+                                className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all flex items-center gap-2 ${quadrantMode === '1' ? 'bg-white shadow text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <Grid className="w-3 h-3" /> Positive Only
+                            </button>
+                            <button 
+                                onClick={() => { setQuadrantMode('4'); generateNewTarget(); }}
+                                className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all flex items-center gap-2 ${quadrantMode === '4' ? 'bg-white shadow text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                <Maximize className="w-3 h-3" /> All Quadrants
+                            </button>
+                        </div>
+                    </div>
+                </header>
+
+                {/* Main Game Card */}
+                <div className="bg-white p-2 rounded-2xl shadow-lg w-full max-w-2xl flex flex-col items-center relative overflow-hidden">
+                    
+                    {/* Instruction Banner */}
+                    <div className={`w-full p-3 md:p-4 mb-2 rounded-xl flex flex-col items-center justify-center transition-colors duration-300
+                    ${feedback === 'correct' ? 'bg-green-100' : feedback === 'incorrect' ? 'bg-red-100' : 'bg-blue-100'}`}>
+                    
+                    <div className="text-slate-600 text-xs md:text-sm font-semibold uppercase tracking-wide mb-1">
+                        {mode === 'point' ? 'Find this location' : 'Plot these endpoints'}
+                    </div>
+                    
+                    <div className="text-2xl md:text-4xl font-black text-slate-800 tracking-tight flex flex-wrap justify-center items-center gap-2 md:gap-4">
+                        {targets.map((t, i) => {
+                        const isFound = foundPoints.some(p => p.x === t.x && p.y === t.y);
+                        return (
+                            <div key={i} className={`flex items-center transition-opacity ${isFound ? 'opacity-40' : 'opacity-100'}`}>
+                                    <span className="text-blue-600">({t.x}, {t.y})</span>
+                                    {i < targets.length - 1 && <span className="text-slate-400 text-lg md:text-xl font-normal ml-2 md:ml-4">and</span>}
+                            </div>
+                        )
+                        })}
+                    </div>
+
+                    {/* Feedback Message */}
+                    <div className="h-6 mt-1 md:mt-2 text-center">
+                        {feedback === 'correct' && (
+                        <span className="text-green-600 font-bold text-sm md:text-base flex items-center justify-center gap-1 animate-bounce">
+                            <Check className="w-4 h-4 md:w-5 md:h-5" /> Excellent!
+                        </span>
+                        )}
+                        {feedback === 'incorrect' && (
+                        <span className="text-red-500 font-bold text-sm md:text-base flex items-center justify-center gap-1">
+                            <X className="w-4 h-4 md:w-5 md:h-5" /> Incorrect. Clicked ({clickedPoint?.x}, {clickedPoint?.y})
+                        </span>
+                        )}
+                        {feedback === 'partial' && (
+                        <span className="text-blue-600 font-bold text-sm md:text-base flex items-center justify-center gap-1">
+                            <Check className="w-4 h-4" /> Good! Next point.
+                        </span>
+                        )}
+                        {!feedback && (
+                        <span className="text-blue-400 text-xs md:text-sm flex items-center justify-center gap-1">
+                            <Info className="w-3 h-3 md:w-4 md:h-4" /> Tap the intersection
+                        </span>
+                        )}
+                    </div>
+                    </div>
+
+                    {/* Canvas Container */}
+                    <div className="relative w-full aspect-square max-w-[500px] cursor-crosshair">
+                    <canvas
+                        ref={canvasRef}
+                        width={600}
+                        height={600}
+                        onClick={handleCanvasClick}
+                        className="w-full h-full touch-none select-none rounded-lg border border-slate-100"
+                        style={{ touchAction: 'none' }}
+                    />
+                    </div>
+
+                    {/* Controls */}
+                    <div className="w-full border-t p-4 mt-2 flex justify-between items-center">
+                        <div className="text-xs text-slate-400 hidden md:block">
+                        Remember: <b>X</b> is across, <b>Y</b> is up/down.
+                        </div>
+                        <button 
+                        onClick={generateNewTarget}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors ml-auto md:ml-0 text-sm"
+                        >
+                        <RefreshCw className="w-4 h-4" />
+                        Skip
+                        </button>
+                    </div>
+
+                </div>
+
+                {/* Grid Settings */}
+                <div className="mt-8 text-center">
+                    <p className="text-slate-400 text-xs mb-2">Teacher Controls: Grid Size</p>
+                    <div className="flex gap-2 justify-center">
+                        {[5, 10, 20].map(size => (
+                            <button 
+                            key={size}
+                            onClick={() => setGridSize(size)}
+                            className={`px-3 py-1 text-xs rounded-full border transition-colors ${gridSize === size ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-300 hover:border-slate-400'}`}
+                            >
+                            {size}x{size}
+                            </button>
+                        ))}
                     </div>
                 </div>
-                <div className="text-center">
-                    <div className="text-[10px] md:text-xs uppercase tracking-wider text-slate-400 font-bold">Score</div>
-                    <div className="text-lg md:text-xl font-bold text-slate-700">{score}</div>
+
                 </div>
-            </div>
-        </div>
+            );
+        };
 
-        {/* Controls Row */}
-        <div className="flex flex-col md:flex-row gap-2 justify-between border-t pt-3">
-             {/* Mode Selector */}
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-lg self-start">
-                <button 
-                    onClick={() => { setMode('point'); generateNewTarget(); }}
-                    className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all ${mode === 'point' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    Points
-                </button>
-                <button 
-                    onClick={() => { setMode('line'); generateNewTarget(); }}
-                    className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all ${mode === 'line' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    Lines
-                </button>
-            </div>
-
-            {/* Quadrant Selector */}
-            <div className="flex gap-1 bg-slate-100 p-1 rounded-lg self-start">
-                <button 
-                    onClick={() => { setQuadrantMode('1'); generateNewTarget(); }}
-                    className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all flex items-center gap-2 ${quadrantMode === '1' ? 'bg-white shadow text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    <Grid className="w-3 h-3" /> Positive Only
-                </button>
-                <button 
-                    onClick={() => { setQuadrantMode('4'); generateNewTarget(); }}
-                    className={`px-3 py-1.5 rounded-md text-xs md:text-sm font-semibold transition-all flex items-center gap-2 ${quadrantMode === '4' ? 'bg-white shadow text-purple-600' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    <Maximize className="w-3 h-3" /> All Quadrants
-                </button>
-            </div>
-        </div>
-      </header>
-
-      {/* Main Game Card */}
-      <div className="bg-white p-2 rounded-2xl shadow-lg w-full max-w-2xl flex flex-col items-center relative overflow-hidden">
-        
-        {/* Instruction Banner */}
-        <div className={`w-full p-3 md:p-4 mb-2 rounded-xl flex flex-col items-center justify-center transition-colors duration-300
-          ${feedback === 'correct' ? 'bg-green-100' : feedback === 'incorrect' ? 'bg-red-100' : 'bg-blue-100'}`}>
-          
-          <div className="text-slate-600 text-xs md:text-sm font-semibold uppercase tracking-wide mb-1">
-            {mode === 'point' ? 'Find this location' : 'Plot these endpoints'}
-          </div>
-          
-          <div className="text-2xl md:text-4xl font-black text-slate-800 tracking-tight flex flex-wrap justify-center items-center gap-2 md:gap-4">
-            {targets.map((t, i) => {
-               const isFound = foundPoints.some(p => p.x === t.x && p.y === t.y);
-               return (
-                   <div key={i} className={`flex items-center transition-opacity ${isFound ? 'opacity-40' : 'opacity-100'}`}>
-                        <span className="text-blue-600">({t.x}, {t.y})</span>
-                        {i < targets.length - 1 && <span className="text-slate-400 text-lg md:text-xl font-normal ml-2 md:ml-4">and</span>}
-                   </div>
-               )
-            })}
-          </div>
-
-          {/* Feedback Message */}
-          <div className="h-6 mt-1 md:mt-2 text-center">
-            {feedback === 'correct' && (
-              <span className="text-green-600 font-bold text-sm md:text-base flex items-center justify-center gap-1 animate-bounce">
-                <Check className="w-4 h-4 md:w-5 md:h-5" /> Excellent!
-              </span>
-            )}
-            {feedback === 'incorrect' && (
-              <span className="text-red-500 font-bold text-sm md:text-base flex items-center justify-center gap-1">
-                <X className="w-4 h-4 md:w-5 md:h-5" /> Incorrect. Clicked ({clickedPoint?.x}, {clickedPoint?.y})
-              </span>
-            )}
-            {feedback === 'partial' && (
-               <span className="text-blue-600 font-bold text-sm md:text-base flex items-center justify-center gap-1">
-                 <Check className="w-4 h-4" /> Good! Next point.
-               </span>
-            )}
-            {!feedback && (
-               <span className="text-blue-400 text-xs md:text-sm flex items-center justify-center gap-1">
-                 <Info className="w-3 h-3 md:w-4 md:h-4" /> Tap the intersection
-               </span>
-            )}
-          </div>
-        </div>
-
-        {/* Canvas Container */}
-        <div className="relative w-full aspect-square max-w-[500px] cursor-crosshair">
-          <canvas
-            ref={canvasRef}
-            width={600}
-            height={600}
-            onClick={handleCanvasClick}
-            className="w-full h-full touch-none select-none rounded-lg border border-slate-100"
-            style={{ touchAction: 'none' }}
-          />
-        </div>
-
-        {/* Controls */}
-        <div className="w-full border-t p-4 mt-2 flex justify-between items-center">
-            <div className="text-xs text-slate-400 hidden md:block">
-               Remember: <b>X</b> is across, <b>Y</b> is up/down.
-            </div>
-            <button 
-              onClick={generateNewTarget}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors ml-auto md:ml-0 text-sm"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Skip
-            </button>
-        </div>
-
-      </div>
-
-      {/* Grid Settings */}
-      <div className="mt-8 text-center">
-         <p className="text-slate-400 text-xs mb-2">Teacher Controls: Grid Size</p>
-         <div className="flex gap-2 justify-center">
-            {[5, 10, 20].map(size => (
-                <button 
-                  key={size}
-                  onClick={() => setGridSize(size)}
-                  className={`px-3 py-1 text-xs rounded-full border transition-colors ${gridSize === size ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-300 hover:border-slate-400'}`}
-                >
-                  {size}x{size}
-                </button>
-            ))}
-         </div>
-      </div>
-
-    </div>
-  );
-};
-
-export default CoordinateGame;
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<CoordinateGame />);
+    </script>
+</body>
+</html>
